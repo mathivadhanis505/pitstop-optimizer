@@ -1,0 +1,103 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>F1 Pit Stop Strategy</title>
+<style>
+body{font-family:Segoe UI,Arial,sans-serif;background:#111;color:#eee;max-width:900px;margin:30px auto;padding:0 16px}
+h1{color:#e10600;margin-bottom:4px}
+select,button{padding:8px 12px;font-size:15px;margin:4px 6px 4px 0;border-radius:6px;border:1px solid #444;background:#222;color:#eee;cursor:pointer}
+button.on,button#go{background:#e10600;border-color:#e10600}
+.card{background:#1b1b1b;border-radius:8px;padding:14px;margin:12px 0}
+.bar{display:flex;height:36px;border-radius:6px;overflow:hidden;margin:8px 0}
+.seg{display:flex;align-items:center;justify-content:center;color:#000;font-weight:600;font-size:13px;border-right:2px solid #111}
+.small{color:#aaa;font-size:13px}
+.bad{opacity:.65;border-left:4px solid #888}
+.best{border-left:4px solid #43b02a}
+</style>
+</head>
+<body>
+<h1>F1 Pit Stop Strategy</h1>
+<div class="small">Estimated model, not real race data.</div>
+
+<div class="card">
+  <div>Circuit</div>
+  <select id="track"></select>
+  <div style="margin-top:10px">Conditions</div>
+  <button class="wx on" data-w="DRY">DRY</button>
+  <button class="wx" data-w="DAMP">DAMP</button>
+  <button class="wx" data-w="WET">WET</button>
+  <div id="tyres" class="small" style="margin:6px 0">Tyres: SOFT, MEDIUM, HARD</div>
+  <button id="go">Predict strategy</button>
+  <button id="save">Save best plan</button>
+</div>
+
+<div id="out"></div>
+
+<script>
+const COL = {SOFT:'#E10600', MEDIUM:'#FFD100', HARD:'#FFFFFF', INTER:'#43B02A', WET:'#0067AD'};
+const TYRES = {DRY:'SOFT, MEDIUM, HARD', DAMP:'INTER, MEDIUM (slicks are slow on a damp track)', WET:'WET, INTER'};
+let weather = 'DRY';
+
+function bar(p) {
+  const total = p.stint_laps.reduce((a, b) => a + b, 0);
+  return '<div class="bar">' + p.compounds.map((c, i) =>
+    '<div class="seg" style="width:' + (p.stint_laps[i] / total * 100) + '%;background:' + COL[c] + '">' +
+    c + ' ' + p.stint_laps[i] + '</div>').join('') + '</div>';
+}
+
+async function init() {
+  const tracks = await (await fetch('/tracks')).json();
+  const sel = document.getElementById('track');
+  tracks.forEach(t => {
+    const o = document.createElement('option');
+    o.value = t.track_id;
+    o.textContent = t.name + ' (' + t.country + ', ' + t.laps + ' laps)';
+    sel.appendChild(o);
+  });
+  document.querySelectorAll('.wx').forEach(b => b.onclick = () => {
+    weather = b.dataset.w;
+    document.querySelectorAll('.wx').forEach(x => x.classList.toggle('on', x === b));
+    document.getElementById('tyres').textContent = 'Tyres: ' + TYRES[weather];
+  });
+  document.getElementById('go').onclick = predict;
+  document.getElementById('save').onclick = save;
+}
+
+async function predict() {
+  const id = document.getElementById('track').value;
+  const d = await (await fetch('/strategy/' + id + '?weather=' + weather)).json();
+  let h = '';
+  if (!d.best) {
+    h += '<div class="card">' + d.message + '</div>';
+  } else {
+    h += '<div class="card best"><h2>Recommended: ' + d.best.stops + ' stop(s)</h2>' + bar(d.best) +
+         '<div>Pit on lap(s): ' + (d.best.pit_laps.join(', ') || 'none') + '</div>' +
+         '<div class="small">' + d.best.why + '</div></div>';
+    h += '<h3>Other viable options</h3>';
+    d.alternatives.forEach(a => {
+      h += '<div class="card"><b>' + a.stops + ' stop(s)</b> &nbsp; +' + a.delta_s + 's' + bar(a) +
+           '<div class="small">' + a.why_not + '</div></div>';
+    });
+  }
+  if (d.rejected.length) {
+    h += '<h3>Not viable</h3>';
+    d.rejected.forEach(r => {
+      h += '<div class="card bad"><b>' + r.stops + ' stop(s)</b>' + bar(r) +
+           '<div class="small">' + r.why_not + '</div></div>';
+    });
+  }
+  document.getElementById('out').innerHTML = h;
+}
+
+async function save() {
+  const id = document.getElementById('track').value;
+  const r = await fetch('/strategy/' + id + '/save?weather=' + weather, {method: 'POST'});
+  const d = await r.json();
+  alert(r.ok ? 'Saved plan #' + d.saved_plan_id : (d.detail || 'Error'));
+}
+
+init();
+</script>
+</body>
+</html>
