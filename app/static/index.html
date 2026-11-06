@@ -1,100 +1,2810 @@
 <!doctype html>
-<html>
+<html lang="en">
 <head>
 <meta charset="utf-8">
-<title>F1 Pit Stop Strategy</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pitstop Optimizer</title>
+<!-- Google Fonts: Inter, Manrope & JetBrains Mono -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Manrope:wght@500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<!-- Chart.js 4.4.2 & GSAP 3.12.5 -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+
 <style>
-body{font-family:Segoe UI,Arial,sans-serif;background:#111;color:#eee;max-width:900px;margin:30px auto;padding:0 16px}
-h1{color:#e10600;margin-bottom:4px}
-select,button{padding:8px 12px;font-size:15px;margin:4px 6px 4px 0;border-radius:6px;border:1px solid #444;background:#222;color:#eee;cursor:pointer}
-button.on,button#go{background:#e10600;border-color:#e10600}
-.card{background:#1b1b1b;border-radius:8px;padding:14px;margin:12px 0}
-.bar{display:flex;height:36px;border-radius:6px;overflow:hidden;margin:8px 0}
-.seg{display:flex;align-items:center;justify-content:center;color:#000;font-weight:600;font-size:13px;border-right:2px solid #111}
-.small{color:#aaa;font-size:13px}
-.bad{opacity:.65;border-left:4px solid #888}
-.best{border-left:4px solid #43b02a}
+:root {
+  --bg: #000000;
+  --surface-1: #0A0A0A;
+  --surface-2: #111111;
+  --surface-3: #181818;
+  --border: #262626;
+  --border-subtle: #1C1C1C;
+  --border-bright: #383838;
+  --text-primary: #F5F5F5;
+  --text-secondary: #A1A1AA;
+  --text-muted: #71717A;
+  --ferrari-red: #E10600;
+  --ferrari-red-hover: #C00500;
+  --ferrari-red-glow: rgba(225, 6, 0, 0.16);
+  --green-success: #22C55E;
+  --amber-warn: #EAB308;
+  --code-bg: #050505;
+  --font-sans: 'Inter', 'Manrope', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-display: 'Manrope', 'Inter', -apple-system, sans-serif;
+  --font-mono: 'JetBrains Mono', "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+  --sidebar-width: 270px;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: var(--font-sans);
+  background: var(--bg);
+  color: var(--text-primary);
+  line-height: 1.5;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* WORKSTATION TOP BAR */
+header.workstation-header {
+  background: var(--surface-1);
+  border-bottom: 1px solid var(--border);
+  padding: 12px 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  height: 60px;
+}
+.brand-group {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.brand-monogram {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  background: var(--ferrari-red);
+  color: #FFFFFF;
+  font-weight: 800;
+  font-size: 13px;
+  font-family: var(--font-display);
+  letter-spacing: -0.5px;
+  border-radius: 4px;
+}
+.brand-title {
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  color: #FFFFFF;
+}
+.brand-title span {
+  color: var(--ferrari-red);
+  font-weight: 800;
+}
+.brand-subtitle {
+  font-size: 11px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+.header-telemetry-status {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  font-size: 12px;
+}
+.telemetry-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  padding: 4px 10px;
+  border-radius: 4px;
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+.status-pip {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--green-success);
+  display: inline-block;
+  box-shadow: 0 0 8px rgba(34, 197, 94, 0.6);
+}
+
+/* WORKSTATION LAYOUT */
+.workstation-layout {
+  display: flex;
+  min-height: calc(100vh - 60px);
+}
+
+/* REACT BITS BRANCHED MENU SIDEBAR */
+.workstation-sidebar {
+  width: var(--sidebar-width);
+  background: var(--surface-1);
+  border-right: 1px solid var(--border);
+  padding: 20px 14px 40px 14px;
+  flex-shrink: 0;
+  user-select: none;
+  overflow-y: auto;
+}
+.branched-menu {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  position: relative;
+}
+.menu-group {
+  margin-bottom: 8px;
+}
+.branch-root {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 10px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  color: var(--text-primary);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.branch-root:hover {
+  background: var(--surface-2);
+  border-color: var(--border-subtle);
+}
+.branch-root .root-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.branch-root .branch-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--ferrari-red);
+}
+.branch-caret {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  color: var(--text-muted);
+}
+.menu-group.collapsed .branch-caret {
+  transform: rotate(-90deg);
+}
+
+/* Tree Rail & Curved Connectors */
+.branch-children {
+  position: relative;
+  margin-left: 14px;
+  padding-left: 16px;
+  border-left: 1.5px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 4px;
+  transition: max-height 0.25s ease, opacity 0.2s ease;
+  overflow: hidden;
+}
+.menu-group.collapsed .branch-children {
+  max-height: 0 !important;
+  opacity: 0;
+  pointer-events: none;
+}
+.branch-item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  padding: 7px 10px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  border-radius: 4px;
+  text-decoration: none;
+  cursor: pointer;
+  transition: color 0.15s, background 0.15s, border-color 0.15s;
+  background: transparent;
+  border: 1px solid transparent;
+}
+.branch-item::before {
+  content: '';
+  position: absolute;
+  left: -16px;
+  top: 50%;
+  width: 14px;
+  height: 1px;
+  background: var(--border);
+  transition: background 0.15s;
+}
+.branch-item:hover {
+  color: #FFFFFF;
+  background: var(--surface-2);
+}
+.branch-item:hover::before {
+  background: var(--border-bright);
+}
+.branch-item.active {
+  color: #FFFFFF;
+  font-weight: 600;
+  background: var(--surface-3);
+  border: 1px solid var(--border-bright);
+}
+.branch-item.active::before {
+  background: var(--ferrari-red);
+  height: 1.5px;
+}
+.branch-item .active-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--ferrari-red);
+  margin-right: 8px;
+  opacity: 0;
+  transform: scale(0);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 0 6px var(--ferrari-red);
+}
+.branch-item.active .active-dot {
+  opacity: 1;
+  transform: scale(1);
+}
+
+/* REACT BITS LATTICE LOADER */
+.lattice-loader-container {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 12px;
+  border-radius: 5px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-secondary);
+  user-select: none;
+  transition: border-color 0.2s, opacity 0.2s;
+}
+.lattice-loader-container.hidden {
+  display: none !important;
+}
+.lattice-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 7px);
+  grid-template-rows: repeat(3, 7px);
+  gap: 3.5px;
+  width: 28px;
+  height: 28px;
+  align-items: center;
+  justify-content: center;
+}
+.lattice-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #383838;
+  opacity: 0.18;
+  transition: background-color 0.08s, opacity 0.08s, transform 0.08s, box-shadow 0.08s;
+}
+.lattice-dot.active {
+  background: var(--ferrari-red);
+  opacity: 1;
+  transform: scale(1.15);
+  box-shadow: 0 0 6px var(--ferrari-red);
+}
+.lattice-dot.trail {
+  background: var(--ferrari-red);
+  opacity: 0.45;
+}
+.lattice-grid.done .lattice-dot {
+  background: var(--green-success);
+  opacity: 1;
+  box-shadow: 0 0 4px var(--green-success);
+}
+.lattice-grid.error .lattice-dot {
+  background: var(--ferrari-red);
+  opacity: 1;
+  box-shadow: 0 0 4px var(--ferrari-red);
+}
+.lattice-status-text {
+  color: var(--text-primary);
+  font-weight: 500;
+}
+.lattice-timer {
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+.lattice-icon-status {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+}
+
+/* WORKSTATION MAIN CONTENT */
+.workstation-content {
+  flex: 1;
+  padding: 24px 32px;
+  max-width: 1200px;
+  overflow-y: auto;
+}
+
+/* CARDS & SURFACES */
+.card {
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 20px 22px;
+  margin-bottom: 20px;
+  position: relative;
+}
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border);
+}
+.card-header h2 {
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+  color: #FFFFFF;
+}
+.card-header h3 {
+  font-family: var(--font-display);
+  font-size: 14px;
+  font-weight: 600;
+  color: #FFFFFF;
+}
+.card-header .badge {
+  font-size: 11px;
+  color: var(--text-muted);
+  background: var(--surface-3);
+  border: 1px solid var(--border);
+  padding: 3px 8px;
+  border-radius: 3px;
+  font-family: var(--font-mono);
+  font-weight: 500;
+}
+
+/* FORM CONTROLS */
+label {
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 6px;
+}
+select, input, textarea {
+  font-family: var(--font-sans);
+  font-size: 13px;
+  padding: 8px 12px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  background: var(--code-bg);
+  color: var(--text-primary);
+  outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+select:focus, input:focus, textarea:focus {
+  border-color: var(--ferrari-red);
+  box-shadow: 0 0 0 1px var(--ferrari-red);
+}
+button {
+  font-family: var(--font-sans);
+  font-size: 13px;
+  padding: 8px 16px;
+  border-radius: 4px;
+  cursor: pointer;
+  border: 1px solid transparent;
+  font-weight: 600;
+  transition: all 0.15s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+button.btn-primary {
+  background: var(--ferrari-red);
+  color: #FFFFFF;
+}
+button.btn-primary:hover {
+  background: var(--ferrari-red-hover);
+}
+button.btn-secondary {
+  background: var(--surface-2);
+  color: var(--text-primary);
+  border: 1px solid var(--border);
+}
+button.btn-secondary:hover {
+  background: var(--surface-3);
+  border-color: var(--border-bright);
+}
+
+/* WEATHER BUTTONS */
+.wx-group { display: flex; gap: 6px; }
+.wx-btn {
+  padding: 6px 14px;
+  border-radius: 4px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+}
+.wx-btn.active {
+  background: var(--surface-3);
+  color: #FFFFFF;
+  border-color: var(--ferrari-red);
+}
+
+/* STRATEGY VISUALIZER CENTERPIECE */
+.strategy-row {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 16px 18px;
+  margin-top: 12px;
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.2s;
+}
+.strategy-row.best {
+  border: 1px solid var(--ferrari-red);
+  background: linear-gradient(180deg, rgba(225, 6, 0, 0.05) 0%, var(--surface-2) 100%);
+  position: relative;
+}
+.strategy-row.best::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 4px;
+  height: 100%;
+  background: var(--ferrari-red);
+  border-top-left-radius: 5px;
+  border-bottom-left-radius: 5px;
+}
+.bar {
+  display: flex;
+  height: 36px;
+  border-radius: 4px;
+  overflow: hidden;
+  margin: 12px 0;
+  border: 1px solid #000000;
+  background: #000000;
+}
+.seg {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #111111;
+  font-weight: 700;
+  font-size: 12px;
+  font-family: var(--font-display);
+  border-right: 1px solid rgba(0,0,0,0.3);
+  letter-spacing: 0.2px;
+}
+.seg:last-child { border-right: none; }
+
+.strategy-explanation {
+  font-size: 12px;
+  line-height: 1.65;
+  color: #D4D4D8;
+  background: var(--code-bg);
+  padding: 12px 14px;
+  border-radius: 4px;
+  border: 1px solid var(--border-subtle);
+  margin-top: 10px;
+}
+.strategy-explanation strong {
+  color: #FFFFFF;
+}
+
+/* DRIVER PROFILE HEADER */
+.driver-profile-card {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 14px 18px;
+  margin-bottom: 14px;
+}
+.driver-profile-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+/* STAT CARDS */
+.stat-card {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 14px 16px;
+  position: relative;
+  overflow: hidden;
+}
+.stat-card h4 {
+  font-size: 10px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  margin-bottom: 6px;
+}
+.stat-card .val {
+  font-size: 20px;
+  font-weight: 800;
+  font-family: var(--font-display);
+  color: #FFFFFF;
+  letter-spacing: -0.3px;
+  font-variant-numeric: tabular-nums;
+}
+.stat-card .sub {
+  font-size: 11px;
+  color: var(--text-secondary);
+  margin-top: 3px;
+  font-family: var(--font-mono);
+}
+
+/* CHARTS */
+.chart-container {
+  position: relative;
+  height: 330px;
+  width: 100%;
+  margin: 12px 0;
+  background: var(--code-bg);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 12px;
+}
+
+/* TABLES */
+.table-container {
+  overflow-x: auto;
+  margin-top: 12px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+}
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12.5px;
+}
+th {
+  background: var(--surface-2);
+  color: var(--text-muted);
+  font-weight: 600;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+td {
+  padding: 9px 14px;
+  border-bottom: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+tr:hover td {
+  background: rgba(255,255,255,0.02);
+  color: var(--text-primary);
+}
+tr:last-child td { border-bottom: none; }
+
+/* CODE & SQL */
+pre.sql-code {
+  background: var(--code-bg);
+  padding: 14px 16px;
+  border-radius: 5px;
+  border: 1px solid var(--border);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: #9CDCFE;
+  overflow-x: auto;
+  line-height: 1.55;
+  margin: 10px 0;
+}
+
+/* UTILITIES */
+.meta-stats {
+  display: flex;
+  gap: 16px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.meta-stats b { color: var(--text-primary); }
+.hidden { display: none !important; }
+.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
+.grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+
+@media (max-width: 992px) {
+  .workstation-layout { flex-direction: column; }
+  .workstation-sidebar { width: 100%; border-right: none; border-bottom: 1px solid var(--border); }
+  .workstation-content { padding: 16px; }
+  .grid-2, .grid-3, .grid-4 { grid-template-columns: 1fr; }
+}
+
+.tag-pill {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 3px;
+  font-family: var(--font-mono);
+}
+.tag-empirical {
+  background: rgba(34, 197, 94, 0.15);
+  color: #4ADE80;
+  border: 1px solid #22C55E;
+}
+.tag-simulated {
+  background: rgba(234, 179, 8, 0.15);
+  color: #FACC15;
+  border: 1px solid #EAB308;
+}
 </style>
 </head>
 <body>
-<h1>F1 Pit Stop Strategy</h1>
-<div class="small">Estimated model, not real race data.</div>
 
-<div class="card">
-  <div>Circuit</div>
-  <select id="track"></select>
-  <div style="margin-top:10px">Conditions</div>
-  <button class="wx on" data-w="DRY">DRY</button>
-  <button class="wx" data-w="DAMP">DAMP</button>
-  <button class="wx" data-w="WET">WET</button>
-  <div id="tyres" class="small" style="margin:6px 0">Tyres: SOFT, MEDIUM, HARD</div>
-  <button id="go">Predict strategy</button>
-  <button id="save">Save best plan</button>
+<!-- TOP WORKSTATION HEADER -->
+<header class="workstation-header">
+  <div class="brand-group">
+    <div class="brand-monogram">PO</div>
+    <div>
+      <div class="brand-title">PITSTOP <span>OPTIMIZER</span></div>
+      <div class="brand-subtitle">Race Strategy & Telemetry Workstation</div>
+    </div>
+  </div>
+  <div class="header-telemetry-status">
+    <div class="telemetry-chip">
+      <span class="status-pip"></span>
+      POSTGRESQL 16: ONLINE
+    </div>
+    <div class="telemetry-chip">
+      SEASONS: 2024 - 2026
+    </div>
+    <div id="live-telemetry-clock" class="telemetry-chip" style="color:var(--text-primary); font-weight:600;">
+      UTC --:--:--
+    </div>
+  </div>
+</header>
+
+<div class="workstation-layout">
+
+  <!-- REACT BITS BRANCHED MENU NAVIGATION (4 EXACT SECTIONS) -->
+  <aside class="workstation-sidebar">
+    <nav class="branched-menu" id="branched-nav">
+
+      <!-- SECTION 1: STRATEGY (CENTERPIECE) -->
+      <div class="menu-group" data-group="strategy">
+        <div class="branch-root" onclick="toggleBranchGroup('strategy')">
+          <span class="root-label">
+            <span class="branch-icon">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"></polygon></svg>
+            </span>
+            STRATEGY
+          </span>
+          <span class="branch-caret">
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>
+          </span>
+        </div>
+        <div class="branch-children">
+          <a class="branch-item active" data-tab="tab-dss" onclick="switchWorkstationTab('tab-dss', this)">
+            <span class="active-dot"></span> Strategy Optimizer
+          </a>
+          <a class="branch-item" data-tab="tab-dss" data-scroll="strategy-results-anchor" onclick="switchWorkstationTab('tab-dss', this, 'strategy-results-anchor')">
+            <span class="active-dot"></span> Strategy Results
+          </a>
+          <a class="branch-item" data-tab="tab-acid" data-scroll="sc-proc-anchor" onclick="switchWorkstationTab('tab-acid', this, 'sc-proc-anchor')">
+            <span class="active-dot"></span> Race Scenarios
+          </a>
+        </div>
+      </div>
+
+      <!-- SECTION 2: RACE ANALYTICS -->
+      <div class="menu-group" data-group="analytics">
+        <div class="branch-root" onclick="toggleBranchGroup('analytics')">
+          <span class="root-label">
+            <span class="branch-icon">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>
+            </span>
+            RACE ANALYTICS
+          </span>
+          <span class="branch-caret">
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>
+          </span>
+        </div>
+        <div class="branch-children">
+          <a class="branch-item" data-tab="tab-analytics" onclick="switchWorkstationTab('tab-analytics', this)">
+            <span class="active-dot"></span> Race Analytics
+          </a>
+          <a class="branch-item" data-tab="tab-tyres" onclick="switchWorkstationTab('tab-tyres', this)">
+            <span class="active-dot"></span> Tyre Degradation
+          </a>
+          <a class="branch-item" data-tab="tab-analytics" data-scroll="telemetry-chart-anchor" onclick="switchWorkstationTab('tab-analytics', this, 'telemetry-chart-anchor')">
+            <span class="active-dot"></span> Telemetry
+          </a>
+          <a class="branch-item" data-tab="tab-analytics" data-scroll="delta-chart-anchor" onclick="switchWorkstationTab('tab-analytics', this, 'delta-chart-anchor')">
+            <span class="active-dot"></span> Driver Comparison
+          </a>
+        </div>
+      </div>
+
+      <!-- SECTION 3: F1 DATA -->
+      <div class="menu-group" data-group="data">
+        <div class="branch-root" onclick="toggleBranchGroup('data')">
+          <span class="root-label">
+            <span class="branch-icon">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"></ellipse><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"></path><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"></path></svg>
+            </span>
+            F1 DATA
+          </span>
+          <span class="branch-caret">
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>
+          </span>
+        </div>
+        <div class="branch-children">
+          <a class="branch-item" data-tab="tab-ingestion" data-scroll="sessions-catalog-anchor" onclick="switchWorkstationTab('tab-ingestion', this, 'sessions-catalog-anchor')">
+            <span class="active-dot"></span> Race Sessions
+          </a>
+          <a class="branch-item" data-tab="tab-ingestion" onclick="switchWorkstationTab('tab-ingestion', this)">
+            <span class="active-dot"></span> Data Ingestion
+          </a>
+          <a class="branch-item" data-tab="tab-ingestion" data-scroll="pipeline-architecture-anchor" onclick="switchWorkstationTab('tab-ingestion', this, 'pipeline-architecture-anchor')">
+            <span class="active-dot"></span> Data Quality
+          </a>
+          <a class="branch-item" data-tab="tab-acid" data-scroll="champ-standings-anchor" onclick="switchWorkstationTab('tab-acid', this, 'champ-standings-anchor')">
+            <span class="active-dot"></span> Championship Standings
+          </a>
+        </div>
+      </div>
+
+      <!-- SECTION 4: DBMS LAB -->
+      <div class="menu-group" data-group="academic">
+        <div class="branch-root" onclick="toggleBranchGroup('academic')">
+          <span class="root-label">
+            <span class="branch-icon">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"></polyline><polyline points="8 6 2 12 8 18"></polyline></svg>
+            </span>
+            DBMS LAB
+          </span>
+          <span class="branch-caret">
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>
+          </span>
+        </div>
+        <div class="branch-children">
+          <a class="branch-item" data-tab="tab-lab" onclick="switchWorkstationTab('tab-lab', this)">
+            <span class="active-dot"></span> SQL Query Catalogue
+          </a>
+          <a class="branch-item" data-tab="tab-explain" onclick="switchWorkstationTab('tab-explain', this)">
+            <span class="active-dot"></span> EXPLAIN Visualizer
+          </a>
+          <a class="branch-item" data-tab="tab-acid" data-scroll="sc-proc-anchor" onclick="switchWorkstationTab('tab-acid', this, 'sc-proc-anchor')">
+            <span class="active-dot"></span> Transactions and ACID
+          </a>
+          <a class="branch-item" data-tab="tab-audit" onclick="switchWorkstationTab('tab-audit', this)">
+            <span class="active-dot"></span> Audit and Security
+          </a>
+          <a class="branch-item" data-tab="tab-schema" onclick="switchWorkstationTab('tab-schema', this)">
+            <span class="active-dot"></span> Schema and Normalization
+          </a>
+        </div>
+      </div>
+
+    </nav>
+  </aside>
+
+  <!-- WORKSTATION VIEWPORTS -->
+  <main class="workstation-content">
+
+    <!-- VIEW 1: STRATEGY OPTIMIZER (CENTERPIECE DSS) -->
+    <div id="tab-dss" class="tab-content">
+      <div class="card" style="border-top: 2px solid var(--ferrari-red);">
+        <div class="card-header">
+          <h2>Race Strategy Optimizer</h2>
+          <span class="badge" style="border-color:var(--ferrari-red); color:var(--ferrari-red); font-weight:700;">STRATEGY CENTERPIECE</span>
+        </div>
+
+        <!-- Strategy Controls Grid (Season, Track, Driver, Tyres, Max Stops, Safety Car, Weather) -->
+        <div class="grid-4" style="margin-bottom:14px;">
+          <div>
+            <label for="track-select">Circuit</label>
+            <select id="track-select" style="width:100%"></select>
+          </div>
+          <div>
+            <label for="driver-select">Driver</label>
+            <select id="driver-select" style="width:100%"></select>
+          </div>
+          <div>
+            <label for="starting-compound-select">Starting Compound</label>
+            <select id="starting-compound-select" style="width:100%">
+              <option value="ANY">Any (Optimal Start)</option>
+              <option value="SOFT">Soft</option>
+              <option value="MEDIUM" selected>Medium</option>
+              <option value="HARD">Hard</option>
+            </select>
+          </div>
+          <div>
+            <label for="max-stops-select">Max Stops</label>
+            <select id="max-stops-select" style="width:100%">
+              <option value="0">Any (Calculated Optimal)</option>
+              <option value="1">1 Stop Only</option>
+              <option value="2">2 Stops Only</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="grid-2">
+          <div>
+            <label for="safety-car-select">Race Disruption Scenario</label>
+            <select id="safety-car-select" style="width:100%">
+              <option value="NONE" selected>Green Flag (Full Race Distance)</option>
+              <option value="VSC">Virtual Safety Car (30% Pit Delta Advantage)</option>
+              <option value="SC">Full Safety Car (42% Pit Delta Advantage)</option>
+            </select>
+          </div>
+          <div>
+            <label>Weather Condition</label>
+            <div class="wx-group">
+              <button class="wx-btn active" data-w="DRY">DRY</button>
+              <button class="wx-btn" data-w="DAMP">DAMP</button>
+              <button class="wx-btn" data-w="WET">WET</button>
+            </div>
+            <div id="tyre-hint" style="font-size:11px; color:var(--text-muted); margin-top:6px; font-family:var(--font-mono);">
+              Eligible compounds: SOFT, MEDIUM, HARD
+            </div>
+          </div>
+        </div>
+
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-top:16px;">
+          <div style="display:flex; gap:10px;">
+            <button id="btn-predict" class="btn-primary">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+              Compute Strategy
+            </button>
+            <button id="btn-save-plan" class="btn-secondary">
+              Save Plan
+            </button>
+          </div>
+          <div id="strategy-loader"></div>
+        </div>
+      </div>
+
+      <!-- Strategy Output Anchor & Centerpiece -->
+      <div id="strategy-results-anchor"></div>
+      <div id="strategy-output"></div>
+
+      <!-- Saved Plans Table -->
+      <div id="strategy-plans-anchor" class="card" style="margin-top:20px;">
+        <div class="card-header">
+          <h3>Saved Plans</h3>
+          <button id="btn-reload-plans" class="btn-secondary" style="padding:4px 10px; font-size:11px;">Reload</button>
+        </div>
+        <div class="table-container">
+          <table id="table-saved-plans">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Track</th>
+                <th>Weather</th>
+                <th>Stops</th>
+                <th>Compounds</th>
+                <th>Delta</th>
+                <th>Time</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- VIEW 2: RACE ANALYTICS & TELEMETRY -->
+    <div id="tab-analytics" class="tab-content hidden">
+      <div class="card">
+        <div class="card-header">
+          <h2>Race Telemetry & Pace Analysis</h2>
+          <div style="display:flex; align-items:center; gap:10px;">
+            <div id="analytics-loader"></div>
+            <span class="badge">FastF1 / OpenF1</span>
+          </div>
+        </div>
+
+        <div class="grid-4">
+          <div>
+            <label for="analytics-season-select">Season</label>
+            <select id="analytics-season-select" style="width:100%"></select>
+          </div>
+          <div>
+            <label for="analytics-race-select">Grand Prix</label>
+            <select id="analytics-race-select" style="width:100%"></select>
+          </div>
+          <div>
+            <label for="analytics-d1-select">Driver 1</label>
+            <select id="analytics-d1-select" style="width:100%"></select>
+          </div>
+          <div>
+            <label for="analytics-d2-select">Driver 2</label>
+            <select id="analytics-d2-select" style="width:100%"></select>
+          </div>
+        </div>
+
+        <div style="display:flex; gap:10px; margin-top:16px;">
+          <button id="btn-run-race-analytics" class="btn-primary">
+            Compare Pace
+          </button>
+        </div>
+      </div>
+
+      <!-- Metric Cards -->
+      <div id="analytics-metrics-row" class="grid-4" style="margin-bottom:20px;">
+        <div class="stat-card">
+          <h4>Total Laps</h4>
+          <div id="stat-race-laps" class="val">-</div>
+          <div class="sub">Lap timing</div>
+        </div>
+        <div class="stat-card">
+          <h4>Fastest Lap</h4>
+          <div id="stat-fastest-lap" class="val">-</div>
+          <div id="stat-fastest-driver" class="sub">-</div>
+        </div>
+        <div class="stat-card">
+          <h4>Pit Stops</h4>
+          <div id="stat-race-pits" class="val">-</div>
+          <div class="sub">Completed stops</div>
+        </div>
+        <div class="stat-card">
+          <h4>Avg Pit Loss</h4>
+          <div id="stat-avg-pit-duration" class="val">-</div>
+          <div class="sub">Transit + stop</div>
+        </div>
+      </div>
+
+      <!-- Pace Chart -->
+      <div id="telemetry-chart-anchor" class="card">
+        <div class="card-header">
+          <h3>Lap Pace Progression</h3>
+          <span class="badge">Line</span>
+        </div>
+        <div class="chart-container">
+          <canvas id="chart-lap-pace"></canvas>
+        </div>
+      </div>
+
+      <!-- Delta Chart -->
+      <div id="delta-chart-anchor" class="card">
+        <div class="card-header">
+          <h3>Pace Delta (Gap per Lap)</h3>
+          <span class="badge">Delta</span>
+        </div>
+        <div class="chart-container">
+          <canvas id="chart-pace-delta"></canvas>
+        </div>
+      </div>
+
+      <!-- Stints and Pits Tables -->
+      <div id="stints-pits-anchor" class="grid-2">
+        <div class="card">
+          <div class="card-header">
+            <h3>Driver Tyre Stints</h3>
+            <span class="badge">stints</span>
+          </div>
+          <div class="table-container">
+            <table id="table-analytics-stints">
+              <thead>
+                <tr>
+                  <th>Driver</th>
+                  <th>Stint</th>
+                  <th>Compound</th>
+                  <th>Laps</th>
+                  <th>Range</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr><td colspan="5" style="text-align:center; color:var(--text-muted)">Select a race to load stints.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <h3>Pit Stops</h3>
+            <span class="badge">pit_stops</span>
+          </div>
+          <div class="table-container">
+            <table id="table-analytics-pits">
+              <thead>
+                <tr>
+                  <th>Driver</th>
+                  <th>Stop</th>
+                  <th>Lap</th>
+                  <th>Duration</th>
+                  <th>Stationary</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr><td colspan="5" style="text-align:center; color:var(--text-muted)">Select a race to load pit stops.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- VIEW 3: TYRE DEGRADATION -->
+    <div id="tab-tyres" class="tab-content hidden">
+      <div class="card">
+        <div class="card-header">
+          <h2>Tyre Degradation Analysis</h2>
+          <div style="display:flex; align-items:center; gap:10px;">
+            <div id="tyre-loader"></div>
+            <span class="badge">Empirical Wear</span>
+          </div>
+        </div>
+        <div class="grid-2">
+          <div>
+            <label for="tyre-race-select">Grand Prix</label>
+            <select id="tyre-race-select" style="width:100%"></select>
+          </div>
+          <div style="display:flex; align-items:flex-end;">
+            <button id="btn-calc-tyres" class="btn-primary" style="height:38px;">Generate Degradation</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <h3>Pace vs Tyre Age</h3>
+          <span class="badge">Scatter</span>
+        </div>
+        <div class="chart-container">
+          <canvas id="chart-tyre-deg"></canvas>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <h3>Compound Benchmarks</h3>
+        </div>
+        <div class="table-container">
+          <table id="table-tyre-summary">
+            <thead>
+              <tr>
+                <th>Compound</th>
+                <th>Laps</th>
+                <th>Mean Pace</th>
+                <th>Best Lap</th>
+                <th>Max Stint</th>
+                <th>Degradation</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td colspan="6" style="text-align:center; color:var(--text-muted)">Load race data to compute tyre curves.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- VIEW 4: DATA INGESTION HUB -->
+    <div id="tab-ingestion" class="tab-content hidden">
+      <div id="sessions-catalog-anchor" class="card">
+        <div class="card-header">
+          <h2>F1 Data Ingestion Pipeline</h2>
+          <div style="display:flex; align-items:center; gap:10px;">
+            <div id="ingestion-loader"></div>
+            <span class="badge">FastF1 / OpenF1</span>
+          </div>
+        </div>
+        <div class="grid-3">
+          <div>
+            <label for="ingest-season-input">Season</label>
+            <select id="ingest-season-input" style="width:100%">
+              <option value="2024" selected>2024 (Full Telemetry)</option>
+              <option value="2025">2025 (Results & Standings)</option>
+              <option value="2026">2026 (Ongoing Season)</option>
+              <option value="2023">2023 (Historical)</option>
+            </select>
+          </div>
+          <div>
+            <label for="ingest-round-input">Round (Optional)</label>
+            <input type="number" id="ingest-round-input" placeholder="e.g. 1, or blank for all" style="width:100%" min="1" max="24">
+          </div>
+          <div style="display:flex; align-items:flex-end;">
+            <button id="btn-start-import" class="btn-primary" style="height:38px; width:100%;">Import Session</button>
+          </div>
+        </div>
+        <div id="ingest-feedback" style="margin-top:12px; font-size:12px;"></div>
+      </div>
+
+      <div id="pipeline-architecture-anchor" class="card">
+        <div class="card-header">
+          <h3>Pipeline Architecture & Data Quality</h3>
+          <span class="badge">ETL</span>
+        </div>
+        <div style="font-size:12px; color:var(--text-secondary); line-height:1.7;">
+          <p>&bull; <b>Extraction:</b> OpenF1 REST API with FastF1 fallback; cached locally in <code>.fastf1_cache/</code>.</p>
+          <p>&bull; <b>Cleaning:</b> Driver code normalization, compound mapping, and pit duration sanitization.</p>
+          <p>&bull; <b>Database Load:</b> Idempotent bulk UPSERT into <code>races</code>, <code>results</code>, <code>stints</code>, <code>pit_stops</code>, and <code>lap_telemetry</code>.</p>
+          <p>&bull; <b>Materialized View:</b> Refreshes <code>mv_driver_championship</code> post-ingestion.</p>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <h3>Ingestion Jobs</h3>
+          <button id="btn-reload-jobs" class="btn-secondary" style="padding:4px 10px; font-size:11px;">Refresh</button>
+        </div>
+        <div class="table-container">
+          <table id="table-ingestion-jobs">
+            <thead>
+              <tr>
+                <th>Job</th>
+                <th>Season</th>
+                <th>Round</th>
+                <th>Status</th>
+                <th>Laps</th>
+                <th>Stints</th>
+                <th>Pits</th>
+                <th>Time</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td colspan="8" style="text-align:center; color:var(--text-muted)">Loading ingestion log...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- VIEW 5: SQL QUERY CATALOGUE -->
+    <div id="tab-lab" class="tab-content hidden">
+      <div class="card">
+        <div class="card-header">
+          <h2>Academic SQL Catalogue (20 Queries)</h2>
+          <div style="display:flex; align-items:center; gap:10px;">
+            <div id="query-loader"></div>
+            <span class="badge">DBMS Showcase</span>
+          </div>
+        </div>
+        <div style="margin-bottom:14px;">
+          <label for="query-select">Select Demonstration Query</label>
+          <select id="query-select" style="width:100%"></select>
+        </div>
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+          <span id="query-category-pill" class="badge" style="background:var(--surface-3); color:#FFFFFF;">Joins</span>
+          <button id="btn-run-query" class="btn-primary">Execute Query</button>
+        </div>
+        <div id="query-desc" style="font-size:12.5px; color:var(--text-secondary); margin-bottom:8px;"></div>
+        <pre id="query-sql-display" class="sql-code"></pre>
+      </div>
+
+      <div id="query-result-card" class="card hidden">
+        <div class="card-header">
+          <h3 id="query-result-title">Query Results</h3>
+          <div class="meta-stats">
+            <span>Latency: <b id="metric-exec-time" style="color:var(--green-success);">0 ms</b></span>
+            <span>Rows: <b id="metric-row-count" style="color:#FFFFFF;">0</b></span>
+          </div>
+        </div>
+        <div class="table-container">
+          <table id="table-query-results">
+            <thead></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- VIEW 6: EXPLAIN VISUALIZER -->
+    <div id="tab-explain" class="tab-content hidden">
+      <div class="card">
+        <div class="card-header">
+          <h2>PostgreSQL Query Planner (EXPLAIN ANALYZE)</h2>
+          <div style="display:flex; align-items:center; gap:10px;">
+            <div id="explain-loader"></div>
+            <span class="badge">Physical Optimization</span>
+          </div>
+        </div>
+        <label>Preset Queries</label>
+        <div style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:12px;">
+          <button class="btn-secondary btn-explain-preset" data-sql="SELECT * FROM tracks WHERE pit_loss_s > 22.0;">Index vs Seq Scan</button>
+          <button class="btn-secondary btn-explain-preset" data-sql="SELECT * FROM v_calendar WHERE season = 2026;">Calendar View</button>
+          <button class="btn-secondary btn-explain-preset" data-sql="SELECT race_id, driver_id, lap_no FROM lap_telemetry WHERE race_id = 7 AND lap_no >= 20;">Partition Pruning</button>
+          <button class="btn-secondary btn-explain-preset" data-sql="SELECT * FROM mv_driver_championship WHERE total_points > 100;">Materialized View</button>
+        </div>
+        <label for="explain-input-sql">SQL Query</label>
+        <textarea id="explain-input-sql" rows="2" style="width:100%; font-family:var(--font-mono); font-size:12px; margin-bottom:12px;"></textarea>
+        <button id="btn-run-explain" class="btn-primary">Explain Plan</button>
+      </div>
+
+      <div id="explain-output-card" class="card hidden">
+        <div class="card-header">
+          <h3>Execution Plan (Buffers & Costs)</h3>
+        </div>
+        <pre id="explain-text" class="sql-code" style="color:#A5D6A7; max-height:450px;"></pre>
+      </div>
+    </div>
+
+    <!-- VIEW 7: TRANSACTIONS & STANDINGS (ACID LAB) -->
+    <div id="tab-acid" class="tab-content hidden">
+      <!-- Stored Procedure Safety Car -->
+      <div id="sc-proc-anchor" class="card">
+        <div class="card-header">
+          <h2>Safety Car Procedure (sp_apply_safety_car)</h2>
+          <div style="display:flex; align-items:center; gap:10px;">
+            <div id="proc-loader"></div>
+            <span class="badge">ACID</span>
+          </div>
+        </div>
+        <div class="grid-2">
+          <div>
+            <label for="proc-plan-id">Plan ID</label>
+            <input type="number" id="proc-plan-id" value="1" style="width:100%">
+          </div>
+          <div>
+            <label for="proc-discount">Pit Discount (%)</label>
+            <input type="number" id="proc-discount" value="50.0" style="width:100%">
+          </div>
+        </div>
+        <div style="margin-top:14px;">
+          <button id="btn-run-proc" class="btn-primary">Execute Procedure</button>
+        </div>
+        <div id="proc-result" style="margin-top:12px; font-size:12px; font-family:var(--font-mono); color:#81C784;"></div>
+      </div>
+
+      <!-- Championship Standings -->
+      <div id="champ-standings-anchor" class="card">
+        <div class="card-header">
+          <h2>Championship Standings</h2>
+          <div style="display:flex; gap:8px; align-items:center;">
+            <div id="mview-loader"></div>
+            <select id="select-champ-season" style="font-size:12px; padding:4px 8px;">
+              <option value="2026" selected>2026 (In Progress)</option>
+              <option value="2025">2025 (Final)</option>
+              <option value="2024">2024 (Final)</option>
+              <option value="">All Seasons</option>
+            </select>
+            <button id="btn-refresh-mview" class="btn-secondary" style="padding:4px 10px; font-size:11px;">Refresh MView</button>
+          </div>
+        </div>
+        <div class="table-container">
+          <table id="table-mview">
+            <thead>
+              <tr>
+                <th>Rank</th>
+                <th>Code</th>
+                <th>Driver</th>
+                <th>Team</th>
+                <th>Wins</th>
+                <th>Podiums</th>
+                <th>Points</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- VIEW 8: AUDIT LOG & SECURITY -->
+    <div id="tab-audit" class="tab-content hidden">
+      <div class="card">
+        <div class="card-header">
+          <h2>CDC Trigger Audit Log</h2>
+          <div style="display:flex; align-items:center; gap:10px;">
+            <div id="audit-loader"></div>
+            <button id="btn-reload-audit" class="btn-secondary" style="padding:4px 10px; font-size:11px;">Reload</button>
+          </div>
+        </div>
+        <div class="table-container">
+          <table id="table-audit-log">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Table</th>
+                <th>Action</th>
+                <th>Record</th>
+                <th>Changes (JSONB)</th>
+                <th>User</th>
+                <th>Timestamp</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Single Canonical CDC Trigger Test -->
+      <div class="card">
+        <div class="card-header">
+          <h3>Test CDC Trigger</h3>
+          <span class="badge" style="background:rgba(34, 197, 94, 0.2); color:#4ADE80; border-color:#22C55E;">Live Trigger</span>
+        </div>
+        <div style="display:flex; gap:8px; flex-wrap:wrap;">
+          <button id="btn-audit-sim-insert" class="btn-primary" style="background:var(--green-success);">Trigger INSERT</button>
+          <button id="btn-audit-sim-update" class="btn-secondary" style="border-color:var(--amber-warn); color:#FACC15;">Trigger UPDATE</button>
+          <button id="btn-audit-sim-delete" class="btn-secondary" style="border-color:var(--ferrari-red); color:#F87171;">Trigger DELETE</button>
+        </div>
+        <div id="audit-sim-feedback" style="margin-top:10px; font-size:12px; font-family:var(--font-mono);"></div>
+      </div>
+    </div>
+
+    <!-- VIEW 9: SCHEMA & NORMALIZATION -->
+    <div id="tab-schema" class="tab-content hidden">
+      <div class="card">
+        <div class="card-header">
+          <h2>Database Schema & Normalization</h2>
+          <span class="badge">Architecture</span>
+        </div>
+        <div class="grid-2">
+          <div>
+            <h3 style="font-size:13px; margin-bottom:8px; color:#FFFFFF;">15 Relational Tables</h3>
+            <ul style="font-size:12px; color:var(--text-secondary); margin-left:16px; line-height:1.7;">
+              <li><b>tracks:</b> (<u>track_id</u>, name, slug, country_id*, laps, pit_loss_s)</li>
+              <li><b>countries:</b> (<u>country_id</u>, name)</li>
+              <li><b>compounds:</b> (<u>compound_id</u>, name, hardness_rank, colour_hex)</li>
+              <li><b>compound_weather:</b> (<u>compound_id*</u>, <u>weather_id*</u>, pace_offset_s, deg_per_lap_s)</li>
+              <li><b>teams:</b> (<u>team_id</u>, name)</li>
+              <li><b>drivers:</b> (<u>driver_id</u>, code, full_name, team_id*)</li>
+              <li><b>races:</b> (<u>race_id</u>, season, round_no, track_id*, race_date, status)</li>
+              <li><b>results:</b> (<u>race_id*</u>, <u>driver_id*</u>, grid_pos, finish_pos)</li>
+              <li><b>stints:</b> (<u>race_id*</u>, <u>driver_id*</u>, <u>stint_no</u>, compound_id*, start_lap, end_lap)</li>
+              <li><b>pit_stops:</b> (<u>pit_stop_id</u>, race_id*, driver_id*, stop_no, lap_no, pit_duration_s)</li>
+              <li><b>strategy_plans:</b> (<u>plan_id</u>, track_id*, weather_id*, stops, delta_s, created_at)</li>
+              <li><b>plan_stints:</b> (<u>plan_id*</u>, <u>stint_no</u>, compound_id*, stint_laps)</li>
+              <li><b>lap_telemetry:</b> (<u>race_id*</u>, <u>driver_id*</u>, <u>lap_no</u>, lap_time_s) [Partitioned]</li>
+              <li><b>audit_log:</b> (<u>audit_id</u>, table_name, action_type, record_id, changed_by, changed_at)</li>
+              <li><b>ingestion_jobs:</b> (<u>job_id</u>, season, round_no, status, laps_imported)</li>
+            </ul>
+          </div>
+          <div>
+            <h3 style="font-size:13px; margin-bottom:8px; color:#FFFFFF;">Key DBMS Features</h3>
+            <ul style="font-size:12px; color:var(--text-secondary); margin-left:16px; line-height:1.7;">
+              <li><b>Procedures:</b> <code>sp_apply_safety_car</code>, <code>sp_simulate_race_pit_stops</code></li>
+              <li><b>Triggers:</b> <code>trg_audit_plans</code> (CDC), <code>trg_check_pit_bounds</code></li>
+              <li><b>Materialized Views:</b> <code>mv_driver_championship</code> with window rankings</li>
+              <li><b>Views:</b> <code>v_calendar</code>, <code>v_pit_stop_performance</code></li>
+              <li><b>Partitioning:</b> Range partitioned on <code>race_id</code></li>
+              <li><b>Concurrency:</b> <code>SELECT ... FOR UPDATE</code> locks</li>
+              <li><b>Indexes:</b> Composite B-trees on <code>(season, round_no)</code></li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </main>
 </div>
 
-<div id="out"></div>
-
 <script>
-const COL = {SOFT:'#E10600', MEDIUM:'#FFD100', HARD:'#FFFFFF', INTER:'#43B02A', WET:'#0067AD'};
-const TYRES = {DRY:'SOFT, MEDIUM, HARD', DAMP:'INTER, MEDIUM (slicks are slow on a damp track)', WET:'WET, INTER'};
-let weather = 'DRY';
+// -----------------------------------------------------------------------------
+// CONSTANTS & GLOBALS
+// -----------------------------------------------------------------------------
+const COL = {
+  SOFT: '#E10600',
+  MEDIUM: '#FFD100',
+  HARD: '#E5E5E5',
+  INTER: '#00D2BE',
+  WET: '#0090FF'
+};
 
-function bar(p) {
+const TYRES = {
+  DRY: 'Eligible compounds: SOFT, MEDIUM, HARD',
+  DAMP: 'Eligible compounds: MEDIUM, INTER',
+  WET: 'Eligible compounds: INTER, WET'
+};
+
+let currentWeather = 'DRY';
+let academicQueries = [];
+
+// Chart references
+let lapPaceChart = null;
+let paceDeltaChart = null;
+let tyreDegChart = null;
+
+// Motion check for GSAP
+const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+// Live Telemetry Clock
+function updateTelemetryClock() {
+  const d = new Date();
+  const timeStr = d.toISOString().substring(11, 19);
+  const el = document.getElementById('live-telemetry-clock');
+  if (el) el.textContent = `UTC ${timeStr}`;
+}
+setInterval(updateTelemetryClock, 1000);
+updateTelemetryClock();
+
+// -----------------------------------------------------------------------------
+// REACT BITS LATTICE LOADER CLASS
+// -----------------------------------------------------------------------------
+class LatticeLoader {
+  constructor(containerId) {
+    this.container = document.getElementById(containerId);
+    this.timerInterval = null;
+    this.stepInterval = null;
+    this.startTime = 0;
+    this.orbit = [0, 1, 2, 5, 8, 7, 6, 3];
+    this.orbitStep = 0;
+    this.dots = [];
+    this._renderStructure();
+  }
+
+  _renderStructure() {
+    if (!this.container) return;
+    this.container.classList.add('lattice-loader-container', 'hidden');
+    this.container.innerHTML = `
+      <div class="lattice-grid">
+        ${Array.from({ length: 9 }).map((_, i) => `<div class="lattice-dot" data-idx="${i}"></div>`).join('')}
+      </div>
+      <span class="lattice-icon-status"></span>
+      <span class="lattice-status-text">Ready</span>
+      <span class="lattice-timer">0ms</span>
+    `;
+    this.grid = this.container.querySelector('.lattice-grid');
+    this.dots = this.container.querySelectorAll('.lattice-dot');
+    this.statusText = this.container.querySelector('.lattice-status-text');
+    this.timerText = this.container.querySelector('.lattice-timer');
+    this.iconStatus = this.container.querySelector('.lattice-icon-status');
+  }
+
+  start(message = 'Processing...') {
+    if (!this.container) return;
+    this.container.classList.remove('hidden');
+    this.container.style.opacity = '1';
+    this.grid.className = 'lattice-grid';
+    this.iconStatus.innerHTML = '';
+    this.statusText.textContent = message;
+    this.statusText.style.color = 'var(--text-primary)';
+    this.startTime = performance.now();
+    this.orbitStep = 0;
+
+    this.dots.forEach(d => { d.className = 'lattice-dot'; });
+    clearInterval(this.stepInterval);
+    clearInterval(this.timerInterval);
+
+    this.stepInterval = setInterval(() => {
+      const currentIdx = this.orbit[this.orbitStep % this.orbit.length];
+      const prevIdx = this.orbit[(this.orbitStep - 1 + this.orbit.length) % this.orbit.length];
+      
+      this.dots.forEach(d => d.className = 'lattice-dot');
+      if (this.dots[prevIdx]) this.dots[prevIdx].classList.add('trail');
+      if (this.dots[currentIdx]) this.dots[currentIdx].classList.add('active');
+
+      this.orbitStep++;
+    }, 70);
+
+    this.timerInterval = setInterval(() => {
+      const elapsed = Math.round(performance.now() - this.startTime);
+      if (elapsed < 1000) {
+        this.timerText.textContent = `${elapsed}ms`;
+      } else {
+        this.timerText.textContent = `${(elapsed / 1000).toFixed(2)}s`;
+      }
+    }, 45);
+  }
+
+  stop(success = true, message = '') {
+    clearInterval(this.stepInterval);
+    clearInterval(this.timerInterval);
+    const elapsed = Math.round(performance.now() - this.startTime);
+    const timeStr = elapsed < 1000 ? `${elapsed}ms` : `${(elapsed / 1000).toFixed(2)}s`;
+    this.timerText.textContent = timeStr;
+
+    if (success) {
+      this.grid.className = 'lattice-grid done';
+      this.dots.forEach(d => d.className = 'lattice-dot');
+      this.iconStatus.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#22C55E" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>`;
+      this.statusText.textContent = message || 'Complete';
+      this.statusText.style.color = '#4ADE80';
+    } else {
+      this.grid.className = 'lattice-grid error';
+      this.dots.forEach(d => d.className = 'lattice-dot');
+      this.iconStatus.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#E10600" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>`;
+      this.statusText.textContent = message || 'Failed';
+      this.statusText.style.color = '#F87171';
+    }
+  }
+}
+
+// LatticeLoader Controller Instances
+const stratLoader = new LatticeLoader('strategy-loader');
+const analyticsLoader = new LatticeLoader('analytics-loader');
+const tyreLoader = new LatticeLoader('tyre-loader');
+const ingestLoader = new LatticeLoader('ingestion-loader');
+const queryLoader = new LatticeLoader('query-loader');
+const explainLoader = new LatticeLoader('explain-loader');
+const procLoader = new LatticeLoader('proc-loader');
+const mviewLoader = new LatticeLoader('mview-loader');
+const auditLoader = new LatticeLoader('audit-loader');
+
+// -----------------------------------------------------------------------------
+// GSAP ANIMATION ENGINE
+// -----------------------------------------------------------------------------
+function animatePageEntrance() {
+  if (prefersReducedMotion || typeof gsap === 'undefined') return;
+
+  const tl = gsap.timeline({ defaults: { ease: 'power2.out' } });
+  tl.from('.workstation-header', { y: -20, opacity: 0, duration: 0.35 })
+    .from('.menu-group', { x: -15, opacity: 0, duration: 0.3, stagger: 0.05 }, '-=0.15')
+    .from('#tab-dss .card', { y: 15, opacity: 0, duration: 0.35, stagger: 0.08 }, '-=0.2');
+}
+
+function animateTabTransition(tabId) {
+  if (prefersReducedMotion || typeof gsap === 'undefined') return;
+
+  const target = document.getElementById(tabId);
+  if (!target) return;
+
+  gsap.killTweensOf(target);
+  gsap.fromTo(target,
+    { opacity: 0, y: 10 },
+    { opacity: 1, y: 0, duration: 0.25, ease: 'power2.out' }
+  );
+
+  setTimeout(() => {
+    if (lapPaceChart) lapPaceChart.resize();
+    if (paceDeltaChart) paceDeltaChart.resize();
+    if (tyreDegChart) tyreDegChart.resize();
+  }, 100);
+}
+
+function animateMetricCards() {
+  if (prefersReducedMotion || typeof gsap === 'undefined') return;
+  gsap.from('#analytics-metrics-row .stat-card', {
+    y: 12,
+    opacity: 0,
+    duration: 0.3,
+    stagger: 0.06,
+    ease: 'power2.out'
+  });
+}
+
+function animateStrategyResults() {
+  if (prefersReducedMotion || typeof gsap === 'undefined') return;
+  gsap.from('#strategy-output .strategy-row', {
+    scale: 0.98,
+    opacity: 0,
+    duration: 0.3,
+    stagger: 0.08,
+    ease: 'power2.out'
+  });
+  gsap.from('#strategy-output .seg', {
+    scaleX: 0,
+    transformOrigin: 'left center',
+    duration: 0.4,
+    stagger: 0.05,
+    ease: 'power2.out'
+  });
+}
+
+function animateTableRows(selector) {
+  if (prefersReducedMotion || typeof gsap === 'undefined') return;
+  const rows = document.querySelectorAll(`${selector} tbody tr`);
+  if (!rows || rows.length === 0 || rows.length > 30) return;
+  gsap.from(rows, {
+    opacity: 0,
+    y: 6,
+    duration: 0.2,
+    stagger: 0.02,
+    ease: 'power1.out'
+  });
+}
+
+// -----------------------------------------------------------------------------
+// REACT BITS BRANCHED MENU NAVIGATION LOGIC
+// -----------------------------------------------------------------------------
+function toggleBranchGroup(groupName) {
+  const group = document.querySelector(`.menu-group[data-group="${groupName}"]`);
+  if (!group) return;
+  group.classList.toggle('collapsed');
+}
+
+function switchWorkstationTab(tabId, itemElement, scrollTargetId) {
+  document.querySelectorAll('.branch-item').forEach(b => b.classList.remove('active'));
+  if (itemElement) {
+    itemElement.classList.add('active');
+  }
+
+  document.querySelectorAll('.tab-content').forEach(c => c.classList.add('hidden'));
+  const targetTab = document.getElementById(tabId);
+  if (targetTab) {
+    targetTab.classList.remove('hidden');
+    animateTabTransition(tabId);
+  }
+
+  if (scrollTargetId) {
+    setTimeout(() => {
+      const el = document.getElementById(scrollTargetId);
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 150);
+  }
+
+  if (tabId === 'tab-analytics') {
+    loadAnalyticsSeasons();
+  } else if (tabId === 'tab-tyres') {
+    loadTyreRaces();
+  } else if (tabId === 'tab-ingestion') {
+    loadIngestionJobs();
+  } else if (tabId === 'tab-lab') {
+    loadAcademicQueries();
+  } else if (tabId === 'tab-acid') {
+    loadChampionshipStandings();
+  } else if (tabId === 'tab-audit') {
+    loadAuditLog();
+  }
+}
+
+// Weather selector bindings
+document.querySelectorAll('.wx-btn').forEach(b => {
+  b.onclick = () => {
+    document.querySelectorAll('.wx-btn').forEach(x => x.classList.remove('active'));
+    b.classList.add('active');
+    currentWeather = b.dataset.w;
+    document.getElementById('tyre-hint').textContent = TYRES[currentWeather];
+    predictStrategy();
+  };
+});
+
+function renderStintBar(p) {
   const total = p.stint_laps.reduce((a, b) => a + b, 0);
   return '<div class="bar">' + p.compounds.map((c, i) =>
-    '<div class="seg" style="width:' + (p.stint_laps[i] / total * 100) + '%;background:' + COL[c] + '">' +
-    c + ' ' + p.stint_laps[i] + '</div>').join('') + '</div>';
+    '<div class="seg" style="width:' + (p.stint_laps[i] / total * 100) + '%;background:' + (COL[c] || '#888888') + '">' +
+    c + ' (' + p.stint_laps[i] + ' laps)</div>').join('') + '</div>';
 }
+
+// -----------------------------------------------------------------------------
+// TAB 1: STRATEGY OPTIMIZER (CENTERPIECE DSS)
+// -----------------------------------------------------------------------------
+async function loadTracks() {
+  const sel = document.getElementById('track-select');
+  try {
+    const res = await fetch('/tracks');
+    if (!res.ok) throw new Error(`Server returned status ${res.status}`);
+    const tracks = await res.json();
+    sel.innerHTML = '';
+    if (!tracks || !tracks.length) {
+      sel.innerHTML = '<option value="">(No tracks in database - run seed.sql)</option>';
+      return;
+    }
+    tracks.forEach(t => {
+      const opt = document.createElement('option');
+      opt.value = t.track_id;
+      opt.textContent = `${t.name} (${t.country}, ${t.laps} laps, pit loss: ${t.pit_loss_s}s)`;
+      if (t.slug === 'interlagos') opt.selected = true;
+      sel.appendChild(opt);
+    });
+    await loadDrivers();
+    predictStrategy();
+  } catch (err) {
+    console.error('Failed loading tracks:', err);
+    sel.innerHTML = '<option value="">(Failed connecting to database)</option>';
+  }
+}
+
+async function loadDrivers() {
+  const sel = document.getElementById('driver-select');
+  try {
+    const res = await fetch('/drivers');
+    const drivers = await res.json();
+    sel.innerHTML = '<option value="">Field Baseline (Overall Car Model)</option>';
+    drivers.forEach(d => {
+      const opt = document.createElement('option');
+      opt.value = d.code;
+      opt.textContent = `${d.code}: ${d.full_name} (${d.team})`;
+      if (d.code === 'LEC') opt.selected = true;
+      sel.appendChild(opt);
+    });
+  } catch (err) {
+    console.error('Failed loading drivers:', err);
+  }
+}
+
+async function predictStrategy() {
+  const trackId = document.getElementById('track-select').value;
+  const driverCode = document.getElementById('driver-select').value;
+  const startingCompound = document.getElementById('starting-compound-select').value;
+  const maxStops = document.getElementById('max-stops-select').value;
+  const safetyCar = document.getElementById('safety-car-select').value;
+  const out = document.getElementById('strategy-output');
+
+  if (!trackId) return;
+
+  stratLoader.start('Optimizing driver pace & pit windows...');
+
+  try {
+    const params = new URLSearchParams({
+      weather: currentWeather,
+      safety_car: safetyCar
+    });
+    if (driverCode) params.append('driver_code', driverCode);
+    if (startingCompound && startingCompound !== 'ANY') params.append('starting_compound', startingCompound);
+    if (maxStops && maxStops !== '0') params.append('max_stops', maxStops);
+
+    const res = await fetch(`/strategy/${trackId}?${params.toString()}`);
+    const data = await res.json();
+
+    if (!data.best) {
+      stratLoader.stop(false, 'No feasible strategy');
+      out.innerHTML = `<div class="card" style="color:#F87171">${data.message}</div>`;
+      return;
+    }
+
+    stratLoader.stop(true, 'Optimal strategy calculated');
+
+    // Driver Profile Card
+    let driverCard = '';
+    if (data.driver_profile) {
+      const p = data.driver_profile;
+      const isEmpirical = p.has_empirical_telemetry;
+      const tagClass = isEmpirical ? 'tag-empirical' : 'tag-simulated';
+      const tagText = p.confidence;
+
+      driverCard = `
+        <div class="driver-profile-card">
+          <div class="driver-profile-header">
+            <div>
+              <div style="font-size:16px; font-weight:800; font-family:var(--font-display); color:#FFFFFF;">
+                ${p.driver_name} <span style="color:var(--text-muted); font-size:13px; font-family:var(--font-mono); font-weight:600;">[${p.driver_code}]</span>
+              </div>
+              <div style="font-size:12px; color:var(--text-secondary); margin-top:2px;">
+                ${p.team_name} &bull; ${safetyCar === 'SC' ? 'Safety Car Active (-42% Pit Delta)' : (safetyCar === 'VSC' ? 'Virtual Safety Car Active (-30% Pit Delta)' : 'Green Flag Conditions')}
+              </div>
+            </div>
+            <span class="tag-pill ${tagClass}">${tagText}</span>
+          </div>
+
+          <div class="grid-3" style="margin-top:10px;">
+            <div class="stat-card">
+              <h4>Pace Delta vs Field</h4>
+              <div class="val" style="color:${p.pace_delta_s_per_lap <= 0 ? 'var(--green-success)' : '#F87171'};">
+                ${p.pace_delta_s_per_lap > 0 ? '+' : ''}${p.pace_delta_s_per_lap}s/lap
+              </div>
+              <div class="sub">${p.mean_lap_time_s ? 'Measured Mean: ' + p.mean_lap_time_s + 's' : 'Calibrated Baseline Pace'}</div>
+            </div>
+
+            <div class="stat-card">
+              <h4>Team Pit Execution</h4>
+              <div class="val">${p.team_stationary_s}s</div>
+              <div class="sub">${p.team_pit_delta_s > 0 ? '+' : ''}${p.team_pit_delta_s}s vs field avg (N=${p.team_pit_sample_size})</div>
+            </div>
+
+            <div class="stat-card">
+              <h4>Teammate Comparison</h4>
+              <div class="val" style="font-size:14px; margin-top:4px;">${p.teammate_code ? p.teammate_code : 'Solo Car'}</div>
+              <div class="sub">${p.teammate_comparison}</div>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    // Empirical Telemetry Benchmark Card
+    let empiricalCard = '';
+    if (data.empirical_context) {
+      const ctx = data.empirical_context;
+      const isEmpirical = ctx.has_empirical_data;
+      const tagClass = isEmpirical ? 'tag-empirical' : 'tag-simulated';
+      const tagText = isEmpirical ? 'Historical Telemetry Benchmark' : 'Theoretical Simulation';
+
+      let statsGrid = '';
+      if (isEmpirical) {
+        statsGrid = `
+          <div class="grid-3" style="margin-top:10px;">
+            <div class="stat-card">
+              <h4>Measured Pit Loss</h4>
+              <div class="val">${ctx.pit_loss.measured_empirical_s}s</div>
+              <div class="sub">Model: ${ctx.pit_loss.theoretical_model_s}s (N=${ctx.pit_loss.sample_pit_stops})</div>
+            </div>
+            <div class="stat-card">
+              <h4>Safety Car Saving</h4>
+              <div class="val" style="color:var(--green-success);">${ctx.safety_car_scenario.sc_time_saved_s > 0 ? '-' : ''}${ctx.safety_car_scenario.sc_time_saved_s}s</div>
+              <div class="sub">Pit loss: ${ctx.safety_car_scenario.sc_pit_loss_s}s</div>
+            </div>
+            <div class="stat-card">
+              <h4>Winner Strategy</h4>
+              <div class="val" style="font-size:14px; margin-top:4px;">${ctx.historical_race_precedent ? ctx.historical_race_precedent.winner : 'N/A'}</div>
+              <div class="sub">${ctx.historical_race_precedent ? ctx.historical_race_precedent.strategy : 'N/A'}</div>
+            </div>
+          </div>
+        `;
+      } else {
+        statsGrid = `
+          <div style="font-size:12px; color:var(--text-secondary); margin-top:8px;">
+            ${ctx.disclaimer}
+          </div>
+        `;
+      }
+
+      empiricalCard = `
+        <div class="card" style="margin-bottom:14px; border-left: 3px solid ${isEmpirical ? 'var(--green-success)' : 'var(--amber-warn)'};">
+          <div class="card-header">
+            <h3>Circuit Telemetry Benchmark</h3>
+            <span class="tag-pill ${tagClass}">${tagText}</span>
+          </div>
+          ${statsGrid}
+        </div>
+      `;
+    }
+
+    let html = `
+      ${driverCard}
+      <div class="strategy-row best" style="margin-bottom:14px;">
+        <div class="card-header" style="border-bottom:none; margin-bottom:0; padding-bottom:0;">
+          <div>
+            <h3 style="color:#FFFFFF; font-size:15px;">Optimal Strategy: ${data.best.stops} Stop(s) (${data.best.compounds.join(' &rarr; ')})</h3>
+            <div style="font-size:11px; color:var(--text-muted); margin-top:2px;">
+              Total Race Delta: <b>${data.best.delta_s ? '+' + data.best.delta_s + 's' : '0.00s (Benchmark baseline)'}</b>
+            </div>
+          </div>
+          <span class="badge" style="background:var(--ferrari-red); color:#FFFFFF; border-color:var(--ferrari-red); font-weight:700;">RECOMMENDED PLAN</span>
+        </div>
+        ${renderStintBar(data.best)}
+        <div style="font-size:12px; margin: 8px 0; font-weight:600; color:#FFFFFF;">
+          Pit Stop Window: ${data.best.pit_laps.length ? 'Lap ' + data.best.pit_laps.join(', Lap ') : 'Non-stop (No pit stops)'}
+        </div>
+        <div class="strategy-explanation">
+          <strong>Strategic Rationale:</strong> ${data.best.why}
+        </div>
+      </div>
+      ${empiricalCard}
+    `;
+
+    if (data.alternatives && data.alternatives.length) {
+      html += `<h4 style="font-size:12px; margin:18px 0 10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.8px;">Alternative Strategies Evaluated</h4>`;
+      data.alternatives.forEach(alt => {
+        html += `
+          <div class="strategy-row" style="margin-bottom:10px;">
+            <div class="card-header" style="border-bottom:none; margin-bottom:0; padding-bottom:0;">
+              <div>
+                <b>${alt.stops} Stop(s): ${alt.compounds.join(' &rarr; ')}</b>
+              </div>
+              <span class="badge" style="color:#F87171;">+${alt.delta_s}s</span>
+            </div>
+            ${renderStintBar(alt)}
+            <div style="font-size:12px; margin: 6px 0; color:var(--text-muted)">
+              Pit Window: ${alt.pit_laps.length ? 'Lap ' + alt.pit_laps.join(', Lap ') : 'None'}
+            </div>
+            <div class="strategy-explanation" style="font-size:11.5px;">
+              <strong>Trade-off Analysis:</strong> ${alt.why_not}
+            </div>
+          </div>
+        `;
+      });
+    }
+
+    if (data.rejected && data.rejected.length) {
+      html += `<h4 style="font-size:12px; margin:18px 0 10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.8px;">Disqualified / High Risk Strategies</h4>`;
+      data.rejected.forEach(rej => {
+        html += `
+          <div class="strategy-row" style="margin-bottom:10px; opacity:0.75; border-color:rgba(239, 68, 68, 0.3);">
+            <div class="card-header" style="border-bottom:none; margin-bottom:0; padding-bottom:0;">
+              <div>
+                <b>${rej.stops} Stop(s): ${rej.compounds.join(' &rarr; ')}</b>
+              </div>
+              <span class="badge" style="color:#F87171; border-color:#EF4444;">DISQUALIFIED</span>
+            </div>
+            ${renderStintBar(rej)}
+            <div class="strategy-explanation" style="font-size:11.5px; border-color:rgba(239, 68, 68, 0.2);">
+              ${rej.why_not}
+            </div>
+          </div>
+        `;
+      });
+    }
+
+    out.innerHTML = html;
+    animateStrategyResults();
+  } catch (err) {
+    stratLoader.stop(false, 'Optimization failed');
+    out.innerHTML = `<div class="card" style="color:#F87171">Error: ${err.message}</div>`;
+  }
+}
+
+async function savePlan() {
+  const trackId = document.getElementById('track-select').value;
+  stratLoader.start('Saving plan to PostgreSQL...');
+  try {
+    const res = await fetch(`/strategy/${trackId}/save?weather=${currentWeather}`, { method: 'POST' });
+    const data = await res.json();
+    if (res.ok) {
+      stratLoader.stop(true, `Plan #${data.saved_plan_id} saved`);
+      loadSavedPlans();
+    } else {
+      stratLoader.stop(false, 'Failed saving plan');
+      alert(`Error saving plan: ${data.detail || 'Failed'}`);
+    }
+  } catch (err) {
+    stratLoader.stop(false, 'Network error');
+    alert(`Request error: ${err.message}`);
+  }
+}
+
+async function loadSavedPlans() {
+  const tbody = document.querySelector('#table-saved-plans tbody');
+  try {
+    const res = await fetch('/plans');
+    const plans = await res.json();
+    if (!plans.length) {
+      tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; color:var(--text-muted)">No saved plans. Click "Save Plan" above to persist plans.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = plans.map(p => `
+      <tr>
+        <td><b>#${p.plan_id}</b></td>
+        <td>${p.track}</td>
+        <td><span class="badge">${p.weather}</span></td>
+        <td>${p.stops}</td>
+        <td><code>${p.compounds}</code></td>
+        <td>${p.delta_s ? '+' + p.delta_s + 's' : '0.0s'}</td>
+        <td style="color:var(--text-muted); font-size:11px; font-family:var(--font-mono);">${new Date(p.created_at).toLocaleTimeString()}</td>
+      </tr>
+    `).join('');
+    animateTableRows('#table-saved-plans');
+  } catch (err) {
+    tbody.innerHTML = `<tr><td colspan="7" style="color:#F87171">Failed loading plans: ${err.message}</td></tr>`;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// TAB 2: RACE ANALYTICS & TELEMETRY
+// -----------------------------------------------------------------------------
+function setChartEmptyState(canvasId, emptyMessage) {
+  const canvas = document.getElementById(canvasId);
+  if (!canvas) return;
+  const container = canvas.parentElement;
+  let emptyDiv = container.querySelector('.chart-empty-state');
+  if (emptyMessage) {
+    canvas.style.display = 'none';
+    if (!emptyDiv) {
+      emptyDiv = document.createElement('div');
+      emptyDiv.className = 'chart-empty-state';
+      emptyDiv.style.cssText = 'display:flex; height:100%; min-height:220px; align-items:center; justify-content:center; text-align:center; color:var(--text-muted); font-size:13px; padding:20px; border:1px dashed var(--border); border-radius:5px; background:rgba(0,0,0,0.4);';
+      container.appendChild(emptyDiv);
+    }
+    emptyDiv.innerHTML = `
+      <div>
+        <div style="display:inline-flex; align-items:center; justify-content:center; width:36px; height:36px; border-radius:50%; background:var(--surface-3); margin-bottom:8px; color:var(--text-muted);">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>
+        </div>
+        <div style="color:#F5F5F5; font-weight:600;">${emptyMessage}</div>
+        <div style="font-size:11px; margin-top:6px; color:var(--text-muted);">Select a session with [Available] or run Ingestion in F1 Data tab.</div>
+      </div>
+    `;
+  } else {
+    canvas.style.display = 'block';
+    if (emptyDiv) emptyDiv.remove();
+  }
+}
+
+async function loadAnalyticsSeasons() {
+  const sSel = document.getElementById('analytics-season-select');
+  try {
+    const res = await fetch('/analytics/seasons');
+    const seasons = await res.json();
+    sSel.innerHTML = seasons.map(s => `<option value="${s}">${s} Championship</option>`).join('');
+    loadAnalyticsRaces();
+  } catch (err) {
+    console.error('Failed loading seasons:', err);
+  }
+}
+
+async function loadAnalyticsRaces() {
+  const season = document.getElementById('analytics-season-select').value;
+  const rSel = document.getElementById('analytics-race-select');
+  try {
+    const res = await fetch(`/analytics/races?season=${season}`);
+    const races = await res.json();
+
+    const imported = races.filter(r => r.lap_count > 0);
+    const unimported = races.filter(r => r.lap_count === 0);
+
+    let html = '';
+    if (imported.length > 0) {
+      html += `<optgroup label="Available Sessions (${imported.length} with Telemetry)">`;
+      html += imported.map(r => `<option value="${r.race_id}">R${r.round_no}: ${r.track_name} (${r.lap_count} laps, ${r.pit_count} stops)</option>`).join('');
+      html += `</optgroup>`;
+    }
+    if (unimported.length > 0) {
+      html += `<optgroup label="Scheduled / Unimported (${unimported.length} races)">`;
+      html += unimported.map(r => `<option value="${r.race_id}">R${r.round_no}: ${r.track_name} (0 laps - Unimported)</option>`).join('');
+      html += `</optgroup>`;
+    }
+    rSel.innerHTML = html;
+
+    if (imported.length > 0) {
+      rSel.value = imported[0].race_id;
+    }
+    await loadAnalyticsDrivers();
+    runRaceAnalytics();
+  } catch (err) {
+    console.error('Failed loading races:', err);
+  }
+}
+
+async function loadAnalyticsDrivers() {
+  const raceId = document.getElementById('analytics-race-select').value;
+  const d1Sel = document.getElementById('analytics-d1-select');
+  const d2Sel = document.getElementById('analytics-d2-select');
+  try {
+    const res = await fetch(`/analytics/drivers?race_id=${raceId}`);
+    const drivers = await res.json();
+    const opts = drivers.map(d => `<option value="${d.code}">${d.code} - ${d.full_name} (${d.team})</option>`).join('');
+    d1Sel.innerHTML = opts;
+    d2Sel.innerHTML = opts;
+    if (drivers.length > 1) {
+      d2Sel.selectedIndex = 1;
+    }
+  } catch (err) {
+    console.error('Failed loading drivers:', err);
+  }
+}
+
+async function runRaceAnalytics() {
+  const raceId = document.getElementById('analytics-race-select').value;
+  const d1 = document.getElementById('analytics-d1-select').value;
+  const d2 = document.getElementById('analytics-d2-select').value;
+  if (!raceId || !d1 || !d2) return;
+
+  analyticsLoader.start('Querying lap telemetry & pit stops...');
+
+  try {
+    const res = await fetch(`/analytics/driver-comparison?race_id=${raceId}&driver1=${d1}&driver2=${d2}`);
+    const laps = await res.json();
+
+    const sRes = await fetch(`/analytics/stints?race_id=${raceId}`);
+    const stints = await sRes.json();
+
+    const pRes = await fetch(`/analytics/pit-stops?race_id=${raceId}`);
+    const pits = await pRes.json();
+
+    analyticsLoader.stop(true, 'Telemetry loaded');
+
+    document.getElementById('stat-race-laps').textContent = laps.length;
+    let minTime = 9999, minDriver = '-';
+    laps.forEach(l => {
+      if (l.d1_lap_time && l.d1_lap_time < minTime) { minTime = l.d1_lap_time; minDriver = d1; }
+      if (l.d2_lap_time && l.d2_lap_time < minTime) { minTime = l.d2_lap_time; minDriver = d2; }
+    });
+    document.getElementById('stat-fastest-lap').textContent = minTime < 9999 ? `${minTime.toFixed(3)}s` : 'N/A';
+    document.getElementById('stat-fastest-driver').textContent = minTime < 9999 ? `Set by ${minDriver}` : '-';
+    document.getElementById('stat-race-pits').textContent = pits.length;
+
+    let avgPit = 0;
+    if (pits.length > 0) {
+      const validPits = pits.filter(p => p.pit_duration_s && parseFloat(p.pit_duration_s) > 0);
+      if (validPits.length > 0) {
+        const sum = validPits.reduce((acc, p) => acc + parseFloat(p.pit_duration_s), 0);
+        avgPit = (sum / validPits.length).toFixed(1);
+      }
+    }
+    document.getElementById('stat-avg-pit-duration').textContent = avgPit > 0 ? `${avgPit}s` : 'N/A';
+
+    animateMetricCards();
+
+    renderLapPaceChart(laps, d1, d2);
+    renderPaceDeltaChart(laps, d1, d2);
+
+    const sTbody = document.querySelector('#table-analytics-stints tbody');
+    if (stints.length) {
+      sTbody.innerHTML = stints.filter(s => s.driver === d1 || s.driver === d2).map(s => `
+        <tr>
+          <td><b>${s.driver}</b></td>
+          <td>Stint ${s.stint_no}</td>
+          <td><span style="color:${COL[s.compound] || '#FFFFFF'}; font-weight:700;">${s.compound}</span></td>
+          <td>${s.total_laps} laps</td>
+          <td style="color:var(--text-muted); font-size:11px; font-family:var(--font-mono);">Laps ${s.start_lap} - ${s.end_lap}</td>
+        </tr>
+      `).join('');
+      animateTableRows('#table-analytics-stints');
+    } else {
+      sTbody.innerHTML = '<tr><td colspan="5" style="text-align:center; color:var(--text-muted)">No stint telemetry for this race.</td></tr>';
+    }
+
+    const pTbody = document.querySelector('#table-analytics-pits tbody');
+    if (pits.length) {
+      pTbody.innerHTML = pits.filter(p => p.driver === d1 || p.driver === d2).map(p => `
+        <tr>
+          <td><b>${p.driver}</b></td>
+          <td>Stop #${p.stop_no}</td>
+          <td>Lap ${p.lap_no}</td>
+          <td>${p.pit_duration_s ? p.pit_duration_s + 's' : 'N/A'}</td>
+          <td style="color:var(--green-success); font-family:var(--font-mono);">${p.stationary_time_s ? p.stationary_time_s + 's' : '—'}</td>
+        </tr>
+      `).join('');
+      animateTableRows('#table-analytics-pits');
+    } else {
+      pTbody.innerHTML = '<tr><td colspan="5" style="text-align:center; color:var(--text-muted)">No pit stop records for these drivers.</td></tr>';
+    }
+
+  } catch (err) {
+    analyticsLoader.stop(false, 'Telemetry failed');
+    alert(`Failed running race analytics: ${err.message}`);
+  }
+}
+
+function renderLapPaceChart(laps, d1, d2) {
+  if (lapPaceChart) {
+    lapPaceChart.destroy();
+    lapPaceChart = null;
+  }
+
+  if (!laps || laps.length === 0) {
+    setChartEmptyState('chart-lap-pace', 'No Lap Pace Telemetry Available for Selected Drivers');
+    return;
+  }
+  setChartEmptyState('chart-lap-pace', null);
+
+  const ctx = document.getElementById('chart-lap-pace').getContext('2d');
+  const labels = laps.map(l => l.lap_no);
+  const dataD1 = laps.map(l => l.d1_lap_time);
+  const dataD2 = laps.map(l => l.d2_lap_time);
+
+  lapPaceChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: labels,
+      datasets: [
+        {
+          label: `${d1} Lap Time (s)`,
+          data: dataD1,
+          borderColor: '#E10600',
+          backgroundColor: 'rgba(225, 6, 0, 0.1)',
+          borderWidth: 2,
+          tension: 0.1,
+          pointRadius: 2.5
+        },
+        {
+          label: `${d2} Lap Time (s)`,
+          data: dataD2,
+          borderColor: '#E5E5E5',
+          backgroundColor: 'rgba(229, 229, 229, 0.08)',
+          borderWidth: 2,
+          tension: 0.1,
+          pointRadius: 2.5
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      scales: {
+        x: {
+          title: { display: true, text: 'Lap Number', color: '#71717A' },
+          grid: { color: 'rgba(255,255,255,0.05)' },
+          ticks: { color: '#71717A' }
+        },
+        y: {
+          title: { display: true, text: 'Lap Time (seconds)', color: '#71717A' },
+          grid: { color: 'rgba(255,255,255,0.05)' },
+          ticks: { color: '#71717A' }
+        }
+      },
+      plugins: {
+        legend: { labels: { color: '#F5F5F5', font: { family: 'Inter' } } }
+      }
+    }
+  });
+}
+
+function renderPaceDeltaChart(laps, d1, d2) {
+  if (paceDeltaChart) {
+    paceDeltaChart.destroy();
+    paceDeltaChart = null;
+  }
+
+  if (!laps || laps.length === 0) {
+    setChartEmptyState('chart-pace-delta', 'No Pace Delta Telemetry Available');
+    return;
+  }
+  setChartEmptyState('chart-pace-delta', null);
+
+  const ctx = document.getElementById('chart-pace-delta').getContext('2d');
+  const labels = laps.map(l => l.lap_no);
+  const deltas = laps.map(l => l.delta_s);
+
+  paceDeltaChart = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: labels,
+      datasets: [{
+        label: `Lap Delta: ${d1} vs ${d2} (seconds)`,
+        data: deltas,
+        backgroundColor: deltas.map(v => v < 0 ? 'rgba(225, 6, 0, 0.8)' : 'rgba(229, 229, 229, 0.8)'),
+        borderColor: deltas.map(v => v < 0 ? '#E10600' : '#FFFFFF'),
+        borderWidth: 1
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      scales: {
+        x: {
+          title: { display: true, text: 'Lap Number', color: '#71717A' },
+          grid: { color: 'rgba(255,255,255,0.05)' },
+          ticks: { color: '#71717A' }
+        },
+        y: {
+          title: { display: true, text: `Pace Delta (s) [<0: ${d1} faster | >0: ${d2} faster]`, color: '#71717A' },
+          grid: { color: 'rgba(255,255,255,0.05)' },
+          ticks: { color: '#71717A' }
+        }
+      },
+      plugins: {
+        legend: { labels: { color: '#F5F5F5', font: { family: 'Inter' } } }
+      }
+    }
+  });
+}
+
+// -----------------------------------------------------------------------------
+// TAB 3: TYRE DEGRADATION
+// -----------------------------------------------------------------------------
+async function loadTyreRaces() {
+  const rSel = document.getElementById('tyre-race-select');
+  try {
+    const res = await fetch('/analytics/races');
+    const races = await res.json();
+
+    const imported = races.filter(r => r.lap_count > 0);
+    const unimported = races.filter(r => r.lap_count === 0);
+
+    let html = '';
+    if (imported.length > 0) {
+      html += `<optgroup label="Available Sessions (${imported.length} with Telemetry)">`;
+      html += imported.map(r => `<option value="${r.race_id}">${r.season} R${r.round_no}: ${r.track_name} (${r.lap_count} laps)</option>`).join('');
+      html += `</optgroup>`;
+    }
+    if (unimported.length > 0) {
+      html += `<optgroup label="Scheduled / Unimported (${unimported.length} races)">`;
+      html += unimported.map(r => `<option value="${r.race_id}">${r.season} R${r.round_no}: ${r.track_name} (0 laps)</option>`).join('');
+      html += `</optgroup>`;
+    }
+    rSel.innerHTML = html;
+    if (imported.length > 0) {
+      rSel.value = imported[0].race_id;
+    }
+    runTyreDegradationAnalysis();
+  } catch (err) {
+    console.error('Failed loading tyre races:', err);
+  }
+}
+
+async function runTyreDegradationAnalysis() {
+  const raceId = document.getElementById('tyre-race-select').value;
+  if (!raceId) return;
+
+  tyreLoader.start('Fitting tyre wear curves...');
+
+  try {
+    const res = await fetch(`/analytics/tyre-degradation?race_id=${raceId}`);
+    const data = await res.json();
+
+    if (tyreDegChart) {
+      tyreDegChart.destroy();
+      tyreDegChart = null;
+    }
+
+    if (!data || data.length === 0) {
+      tyreLoader.stop(false, 'No wear data');
+      setChartEmptyState('chart-tyre-deg', 'No Tyre Degradation Telemetry Available for this Session');
+      const tbody = document.querySelector('#table-tyre-summary tbody');
+      if (tbody) tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; color:var(--text-muted)">No tyre telemetry available for this round.</td></tr>';
+      return;
+    }
+    tyreLoader.stop(true, 'Degradation modeled');
+    setChartEmptyState('chart-tyre-deg', null);
+
+    const compounds = [...new Set(data.map(d => d.compound))];
+    const datasets = compounds.map(comp => {
+      const filtered = data.filter(d => d.compound === comp);
+      return {
+        label: `${comp} Compound`,
+        data: filtered.map(d => ({ x: d.tyre_age_laps, y: d.avg_lap_time })),
+        borderColor: COL[comp] || '#888888',
+        backgroundColor: COL[comp] || '#888888',
+        showLine: true,
+        tension: 0.2,
+        pointRadius: 4
+      };
+    });
+
+    const ctx = document.getElementById('chart-tyre-deg').getContext('2d');
+    tyreDegChart = new Chart(ctx, {
+      type: 'scatter',
+      data: { datasets: datasets },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: {
+          x: {
+            title: { display: true, text: 'Tyre Age (Laps on Set)', color: '#71717A' },
+            grid: { color: 'rgba(255,255,255,0.05)' },
+            ticks: { color: '#71717A' }
+          },
+          y: {
+            title: { display: true, text: 'Average Lap Time (seconds)', color: '#71717A' },
+            grid: { color: 'rgba(255,255,255,0.05)' },
+            ticks: { color: '#71717A' }
+          }
+        },
+        plugins: {
+          legend: { labels: { color: '#F5F5F5', font: { family: 'Inter' } } }
+        }
+      }
+    });
+
+    const tbody = document.querySelector('#table-tyre-summary tbody');
+    if (!compounds.length) {
+      tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; color:var(--text-muted)">No lap telemetry found for this race. Run data ingestion first.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = compounds.map(comp => {
+      const rows = data.filter(d => d.compound === comp);
+      const totalLaps = rows.reduce((acc, r) => acc + r.lap_count, 0);
+      const avgPace = (rows.reduce((acc, r) => acc + r.avg_lap_time * r.lap_count, 0) / (totalLaps || 1)).toFixed(3);
+      const minPace = Math.min(...rows.map(r => r.min_lap_time)).toFixed(3);
+      const maxAge = Math.max(...rows.map(r => r.tyre_age_laps));
+      const firstLap = rows[0]?.avg_lap_time || 0;
+      const lastLap = rows[rows.length - 1]?.avg_lap_time || 0;
+      const slope = rows.length > 1 ? ((lastLap - firstLap) / (rows.length - 1)).toFixed(3) : '+0.060';
+
+      return `
+        <tr>
+          <td><b style="color:${COL[comp] || '#FFFFFF'}">${comp}</b></td>
+          <td>${totalLaps}</td>
+          <td>${avgPace}s</td>
+          <td>${minPace}s</td>
+          <td>${maxAge} laps</td>
+          <td style="color:#FACC15; font-family:var(--font-mono); font-weight:600;">+${slope} s/lap</td>
+        </tr>
+      `;
+    }).join('');
+    animateTableRows('#table-tyre-summary');
+
+  } catch (err) {
+    tyreLoader.stop(false, 'Wear model failed');
+    alert(`Tyre degradation error: ${err.message}`);
+  }
+}
+
+// -----------------------------------------------------------------------------
+// TAB 4: DATA INGESTION HUB
+// -----------------------------------------------------------------------------
+async function triggerDataIngestion() {
+  const season = parseInt(document.getElementById('ingest-season-input').value);
+  const roundVal = document.getElementById('ingest-round-input').value;
+  const round_no = roundVal ? parseInt(roundVal) : null;
+  const feedback = document.getElementById('ingest-feedback');
+
+  ingestLoader.start('Ingesting session from OpenF1 / FastF1...');
+  feedback.innerHTML = '<span style="color:#FACC15;">Connecting to OpenF1 / FastF1 and ingesting session data into PostgreSQL...</span>';
+
+  try {
+    const res = await fetch('/analytics/import', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ season: season, round_no: round_no })
+    });
+    const data = await res.json();
+    if (res.ok) {
+      ingestLoader.stop(true, 'Ingestion finished');
+      feedback.innerHTML = `<span style="color:var(--green-success); font-weight:600;">Data ingestion completed successfully! Refreshing view...</span>`;
+      loadIngestionJobs();
+      loadTracks();
+    } else {
+      ingestLoader.stop(false, 'Ingestion failed');
+      feedback.innerHTML = `<span style="color:#F87171;">Ingestion error: ${data.detail || 'Failed'}</span>`;
+    }
+  } catch (err) {
+    ingestLoader.stop(false, 'Network error');
+    feedback.innerHTML = `<span style="color:#F87171;">Network error: ${err.message}</span>`;
+  }
+}
+
+async function loadIngestionJobs() {
+  const tbody = document.querySelector('#table-ingestion-jobs tbody');
+  try {
+    const res = await fetch('/analytics/import/status');
+    const jobs = await res.json();
+    if (!jobs.length) {
+      tbody.innerHTML = '<tr><td colspan="9" style="text-align:center; color:var(--text-muted)">No ingestion jobs recorded yet.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = jobs.map(j => `
+      <tr>
+        <td><b>#${j.job_id}</b></td>
+        <td>${j.season}</td>
+        <td>${j.round_no ? 'R' + j.round_no : 'All'}</td>
+        <td><span class="badge" style="background:${j.status === 'completed' ? 'rgba(34,197,94,0.2)' : (j.status === 'running' ? 'rgba(234,179,8,0.2)' : 'rgba(239,68,68,0.2)')}; color:${j.status === 'completed' ? '#4ADE80' : (j.status === 'running' ? '#FACC15' : '#F87171')}; border-color:currentColor;">${j.status}</span></td>
+        <td>${j.laps_imported || 0}</td>
+        <td>${j.stints_imported || 0}</td>
+        <td>${j.stops_imported || 0}</td>
+        <td style="color:var(--text-muted); font-size:11px; font-family:var(--font-mono);">${j.started_at ? new Date(j.started_at).toLocaleTimeString() : '-'}</td>
+        <td style="color:var(--text-muted); font-size:11px; font-family:var(--font-mono);">${j.finished_at ? new Date(j.finished_at).toLocaleTimeString() : '-'}</td>
+      </tr>
+    `).join('');
+    animateTableRows('#table-ingestion-jobs');
+  } catch (err) {
+    tbody.innerHTML = `<tr><td colspan="9" style="color:#F87171">Failed loading jobs: ${err.message}</td></tr>`;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// TAB 5: ACADEMIC SQL QUERIES
+// -----------------------------------------------------------------------------
+async function loadAcademicQueries() {
+  try {
+    const res = await fetch('/academic/queries');
+    academicQueries = await res.json();
+    const sel = document.getElementById('query-select');
+    sel.innerHTML = '';
+    academicQueries.forEach(q => {
+      const opt = document.createElement('option');
+      opt.value = q.id;
+      opt.textContent = `Q${q.id}: ${q.title} (${q.category})`;
+      sel.appendChild(opt);
+    });
+    updateSelectedQueryDisplay();
+  } catch (err) {
+    console.error('Failed loading academic queries:', err);
+  }
+}
+
+function updateSelectedQueryDisplay() {
+  const qId = parseInt(document.getElementById('query-select').value);
+  const q = academicQueries.find(x => x.id === qId);
+  if (!q) return;
+  document.getElementById('query-sql-display').textContent = q.sql;
+  document.getElementById('query-desc').textContent = q.description;
+  document.getElementById('query-category-pill').textContent = q.category;
+}
+
+document.getElementById('query-select').onchange = updateSelectedQueryDisplay;
+
+async function runAcademicQuery() {
+  const qId = document.getElementById('query-select').value;
+  const card = document.getElementById('query-result-card');
+  card.classList.remove('hidden');
+  document.getElementById('metric-exec-time').textContent = 'Executing...';
+
+  queryLoader.start(`Executing Query Q${qId}...`);
+
+  try {
+    const res = await fetch(`/academic/query/${qId}/run`, { method: 'POST' });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || 'Execution failed');
+
+    queryLoader.stop(true, `Q${qId} executed`);
+
+    document.getElementById('query-result-title').textContent = data.title;
+    document.getElementById('metric-exec-time').textContent = `${data.execution_time_ms} ms`;
+    document.getElementById('metric-row-count').textContent = data.row_count;
+
+    const thead = document.querySelector('#table-query-results thead');
+    const tbody = document.querySelector('#table-query-results tbody');
+    thead.innerHTML = '<tr>' + data.columns.map(c => `<th>${c}</th>`).join('') + '</tr>';
+    tbody.innerHTML = data.rows.map(r =>
+      '<tr>' + data.columns.map(c => `<td>${r[c] !== null ? r[c] : '<span style="color:#666666">NULL</span>'}</td>`).join('') + '</tr>'
+    ).join('');
+    animateTableRows('#table-query-results');
+  } catch (err) {
+    queryLoader.stop(false, 'Query failed');
+    alert(`Query execution failed: ${err.message}`);
+  }
+}
+
+// -----------------------------------------------------------------------------
+// TAB 6: EXPLAIN VISUALIZER
+// -----------------------------------------------------------------------------
+document.querySelectorAll('.btn-explain-preset').forEach(b => {
+  b.onclick = () => {
+    document.getElementById('explain-input-sql').value = b.dataset.sql;
+  };
+});
+document.getElementById('explain-input-sql').value = 'SELECT * FROM tracks WHERE pit_loss_s > 22.0;';
+
+async function runExplain() {
+  const sql = document.getElementById('explain-input-sql').value;
+  const card = document.getElementById('explain-output-card');
+  const txt = document.getElementById('explain-text');
+  card.classList.remove('hidden');
+  txt.textContent = 'Running EXPLAIN (ANALYZE, BUFFERS)...';
+
+  explainLoader.start('Analyzing query execution plan...');
+
+  try {
+    const res = await fetch(`/academic/explain?sql=${encodeURIComponent(sql)}`);
+    const data = await res.json();
+    if (res.ok) {
+      explainLoader.stop(true, 'Plan analyzed');
+      txt.textContent = data.plan_text;
+    } else {
+      explainLoader.stop(false, 'Plan failed');
+      txt.textContent = `Error: ${data.detail}`;
+    }
+  } catch (err) {
+    explainLoader.stop(false, 'Request error');
+    txt.textContent = `Explain failed: ${err.message}`;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// TAB 7: TRANSACTIONS & STANDINGS (ACID LAB)
+// -----------------------------------------------------------------------------
+async function runSafetyCarProc() {
+  const planId = document.getElementById('proc-plan-id').value;
+  const discount = document.getElementById('proc-discount').value;
+  const resDiv = document.getElementById('proc-result');
+  resDiv.innerHTML = '<span style="color:var(--text-muted)">Calling stored procedure sp_apply_safety_car...</span>';
+
+  procLoader.start('Calling sp_apply_safety_car...');
+
+  try {
+    const res = await fetch(`/academic/safety-car-procedure?plan_id=${planId}&discount_pct=${discount}`, { method: 'POST' });
+    const d = await res.json();
+    if (res.ok) {
+      procLoader.stop(true, 'Procedure completed');
+      resDiv.innerHTML = `
+        <div style="background:rgba(34, 197, 94, 0.15); border:1px solid #22C55E; padding:14px; border-radius:6px;">
+          <div style="font-weight:700; color:#4ADE80; margin-bottom:4px; font-size:13px;">[SUCCESS] Stored Procedure Executed: sp_apply_safety_car</div>
+          <div><b>Circuit:</b> ${d.track_name} (Nominal Pit Loss: ${d.nominal_pit_loss_s}s)</div>
+          <div><b>Discount Applied:</b> ${d.discount_pct}% &rarr; <b>Pit Time Saved:</b> <span style="color:#4ADE80; font-weight:700;">-${d.time_saved_s}s</span></div>
+          <div><b>Strategy Plan #${d.plan_id} Delta:</b> ${d.old_delta_s}s &rarr; <b style="color:#FACC15;">${d.new_delta_s}s</b> (Time advantage relative to green-flag pit stop)</div>
+          <div style="font-size:11px; color:var(--text-secondary); margin-top:6px;">${d.message}</div>
+        </div>
+      `;
+      loadSavedPlans();
+    } else {
+      procLoader.stop(false, 'Procedure error');
+      resDiv.innerHTML = `<span style="color:#F87171">Error: ${d.detail}</span>`;
+    }
+  } catch (err) {
+    procLoader.stop(false, 'Request error');
+    resDiv.innerHTML = `<span style="color:#F87171">Request error: ${err.message}</span>`;
+  }
+}
+
+async function loadChampionshipStandings() {
+  const thead = document.querySelector('#table-mview thead tr');
+  const tbody = document.querySelector('#table-mview tbody');
+  const season = document.getElementById('select-champ-season')?.value || '';
+
+  const statusNote = document.getElementById('champ-season-status') || (() => {
+    const el = document.createElement('div');
+    el.id = 'champ-season-status';
+    el.style.cssText = 'font-size:12px; margin-bottom:12px; padding:10px 14px; border-radius:5px;';
+    const parent = document.getElementById('table-mview').parentElement;
+    parent.insertBefore(el, document.getElementById('table-mview'));
+    return el;
+  })();
+
+  if (season === '2026') {
+    statusNote.style.background = 'rgba(234, 179, 8, 0.15)';
+    statusNote.style.border = '1px solid #EAB308';
+    statusNote.style.color = '#FACC15';
+    statusNote.innerHTML = '<strong>Current: 2026 (Provisional)</strong> &mdash; Leader: <b>Kimi Antonelli</b> (380 pts).';
+  } else if (season === '2025') {
+    statusNote.style.background = 'rgba(34, 197, 94, 0.15)';
+    statusNote.style.border = '1px solid #22C55E';
+    statusNote.style.color = '#4ADE80';
+    statusNote.innerHTML = '<strong>2025 World Champion:</strong> <b>Lando Norris</b> (423 pts).';
+  } else if (season === '2024') {
+    statusNote.style.background = 'rgba(34, 197, 94, 0.15)';
+    statusNote.style.border = '1px solid #22C55E';
+    statusNote.style.color = '#4ADE80';
+    statusNote.innerHTML = '<strong>2024 World Champion:</strong> <b>Max Verstappen</b> (437 pts).';
+  } else {
+    statusNote.style.background = 'rgba(225, 6, 0, 0.1)';
+    statusNote.style.border = '1px solid var(--ferrari-red)';
+    statusNote.style.color = '#FFFFFF';
+    statusNote.innerHTML = '<strong>Championship Archive (2024 - 2026)</strong> &mdash; <code>mv_driver_championship</code>';
+  }
+
+  try {
+    const url = season ? `/academic/championship?season=${season}` : '/academic/championship';
+    const res = await fetch(url);
+    if (!res.ok) {
+      const errText = await res.text();
+      let msg = errText;
+      try {
+        const parsed = JSON.parse(errText);
+        msg = parsed.detail || errText;
+      } catch (e) {}
+      throw new Error(msg);
+    }
+    const rows = await res.json();
+    const showSeason = !season;
+    if (thead) {
+      thead.innerHTML = `
+        <th style="width:75px;">Rank</th>
+        ${showSeason ? '<th>Season</th>' : ''}
+        <th style="width:70px;">Code</th>
+        <th>Driver</th>
+        <th>Team</th>
+        <th style="text-align:center;">Wins</th>
+        <th style="text-align:center;">Podiums</th>
+        <th style="text-align:right;">Points</th>
+      `;
+    }
+    const colSpan = showSeason ? 8 : 7;
+    if (!rows.length) {
+      tbody.innerHTML = `<tr><td colspan="${colSpan}" style="text-align:center; color:var(--text-muted)">No standings available.</td></tr>`;
+      return;
+    }
+
+    let currentSeason = null;
+    let html = '';
+    for (const r of rows) {
+      if (showSeason && r.season !== currentSeason) {
+        currentSeason = r.season;
+        const seasonTitle = currentSeason === 2026 ? '2026 Season (In Progress — Updated after Mexico City GP)' :
+                            currentSeason === 2025 ? '2025 Season (Official Final Standings — Champion: Norris)' :
+                            '2024 Season (Official Final Standings — Champion: Verstappen)';
+        html += `
+          <tr style="background:var(--surface-3); font-weight:700;">
+            <td colspan="8" style="padding:10px 14px; color:var(--ferrari-red);">
+              ${seasonTitle}
+            </td>
+          </tr>
+        `;
+      }
+      const isTop3 = r.championship_rank <= 3;
+      const rankBadge = `P${r.championship_rank}`;
+      const rankColor = r.championship_rank === 1 ? '#FFD700' : (r.championship_rank === 2 ? '#C0C0C0' : (r.championship_rank === 3 ? '#CD7F32' : 'inherit'));
+
+      html += `
+        <tr>
+          <td style="color:${rankColor}; font-weight:${isTop3 ? '700' : '500'};">${rankBadge}</td>
+          ${showSeason ? `<td><b>${r.season || ''}</b></td>` : ''}
+          <td><code>${r.code}</code></td>
+          <td style="font-weight:${isTop3 ? '600' : '400'}; color:#FFFFFF;">${r.full_name}</td>
+          <td>${r.team || 'Independent'}</td>
+          <td style="text-align:center;">${r.wins}</td>
+          <td style="text-align:center;">${r.podiums}</td>
+          <td style="text-align:right; font-weight:700; color:#FFFFFF; font-family:var(--font-mono);">${r.total_points}</td>
+        </tr>
+      `;
+    }
+    tbody.innerHTML = html;
+    animateTableRows('#table-mview');
+  } catch (err) {
+    tbody.innerHTML = `<tr><td colspan="8" style="color:#F87171">Failed loading standings: ${err.message}</td></tr>`;
+  }
+}
+
+async function refreshMView() {
+  mviewLoader.start('Refreshing materialized view...');
+  try {
+    const res = await fetch('/academic/refresh-mview', { method: 'POST' });
+    const d = await res.json();
+    mviewLoader.stop(true, `Refreshed (${d.duration_ms}ms)`);
+    loadChampionshipStandings();
+  } catch (err) {
+    mviewLoader.stop(false, 'Refresh failed');
+    alert(`Error: ${err.message}`);
+  }
+}
+
+// -----------------------------------------------------------------------------
+// TAB 8: AUDIT LOG & SECURITY (CDC TRIGGER DEMONSTRATION)
+// -----------------------------------------------------------------------------
+async function loadAuditLog() {
+  const tbody = document.querySelector('#table-audit-log tbody');
+  try {
+    const res = await fetch('/academic/audit-log');
+    const logs = await res.json();
+    if (!logs.length) {
+      tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; color:var(--text-muted)">Audit log is empty. Use the simulation buttons below to trigger audit records.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = logs.map(l => `
+      <tr>
+        <td><b>#${l.audit_id}</b></td>
+        <td><b>${l.table_name}</b></td>
+        <td><span class="badge" style="background:${l.action_type === 'INSERT' ? 'rgba(34,197,94,0.2)' : (l.action_type === 'UPDATE' ? 'rgba(234,179,8,0.2)' : 'rgba(239,68,68,0.2)')}; color:${l.action_type === 'INSERT' ? '#4ADE80' : (l.action_type === 'UPDATE' ? '#FACC15' : '#F87171')}; border-color:currentColor;">${l.action_type}</span></td>
+        <td>${l.record_id}</td>
+        <td><pre style="font-size:11px; max-width:320px; overflow:hidden; text-overflow:ellipsis; background:var(--code-bg); padding:4px 8px; border-radius:3px;">${JSON.stringify(l.new_data || l.old_data)}</pre></td>
+        <td><code>${l.changed_by}</code></td>
+        <td style="color:var(--text-muted); font-size:11px; font-family:var(--font-mono);">${new Date(l.changed_at).toLocaleTimeString()}</td>
+      </tr>
+    `).join('');
+    animateTableRows('#table-audit-log');
+  } catch (err) {
+    tbody.innerHTML = `<tr><td colspan="7" style="color:#F87171">Failed loading audit log: ${err.message}</td></tr>`;
+  }
+}
+
+async function simulateAuditEvent(action) {
+  const fb = document.getElementById('audit-sim-feedback');
+  fb.textContent = `Executing ${action} on strategy_plans...`;
+  auditLoader.start(`CDC ${action} firing...`);
+  try {
+    const res = await fetch('/academic/audit/simulate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: action })
+    });
+    const d = await res.json();
+    if (res.ok) {
+      auditLoader.stop(true, `Triggered ${action}`);
+      fb.innerHTML = `<span style="color:var(--green-success);">[OK] ${d.message}</span>`;
+      loadAuditLog();
+    } else {
+      auditLoader.stop(false, 'CDC failed');
+      fb.innerHTML = `<span style="color:#F87171;">[Error] ${d.detail || 'Simulation failed'}</span>`;
+    }
+  } catch (err) {
+    auditLoader.stop(false, 'Request error');
+    fb.innerHTML = `<span style="color:#F87171;">[Request Error] ${err.message}</span>`;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// EVENT BINDINGS & INITIALIZATION
+// -----------------------------------------------------------------------------
+document.getElementById('btn-predict').onclick = predictStrategy;
+document.getElementById('btn-save-plan').onclick = savePlan;
+document.getElementById('btn-reload-plans').onclick = loadSavedPlans;
+document.getElementById('btn-run-query').onclick = runAcademicQuery;
+document.getElementById('btn-run-explain').onclick = runExplain;
+document.getElementById('btn-run-proc').onclick = runSafetyCarProc;
+document.getElementById('btn-refresh-mview').onclick = refreshMView;
+document.getElementById('btn-reload-audit').onclick = loadAuditLog;
+
+document.getElementById('track-select').onchange = predictStrategy;
+document.getElementById('driver-select').onchange = predictStrategy;
+document.getElementById('starting-compound-select').onchange = predictStrategy;
+document.getElementById('max-stops-select').onchange = predictStrategy;
+document.getElementById('safety-car-select').onchange = predictStrategy;
+
+document.getElementById('select-champ-season').onchange = loadChampionshipStandings;
+
+document.getElementById('btn-audit-sim-insert').onclick = () => simulateAuditEvent('INSERT');
+document.getElementById('btn-audit-sim-update').onclick = () => simulateAuditEvent('UPDATE');
+document.getElementById('btn-audit-sim-delete').onclick = () => simulateAuditEvent('DELETE');
+
+document.getElementById('analytics-season-select').onchange = loadAnalyticsRaces;
+document.getElementById('analytics-race-select').onchange = loadAnalyticsDrivers;
+document.getElementById('btn-run-race-analytics').onclick = runRaceAnalytics;
+document.getElementById('tyre-race-select').onchange = runTyreDegradationAnalysis;
+document.getElementById('btn-calc-tyres').onclick = runTyreDegradationAnalysis;
+document.getElementById('btn-start-import').onclick = triggerDataIngestion;
+document.getElementById('btn-reload-jobs').onclick = loadIngestionJobs;
 
 async function init() {
-  const tracks = await (await fetch('/tracks')).json();
-  const sel = document.getElementById('track');
-  tracks.forEach(t => {
-    const o = document.createElement('option');
-    o.value = t.track_id;
-    o.textContent = t.name + ' (' + t.country + ', ' + t.laps + ' laps)';
-    sel.appendChild(o);
-  });
-  document.querySelectorAll('.wx').forEach(b => b.onclick = () => {
-    weather = b.dataset.w;
-    document.querySelectorAll('.wx').forEach(x => x.classList.toggle('on', x === b));
-    document.getElementById('tyres').textContent = 'Tyres: ' + TYRES[weather];
-  });
-  document.getElementById('go').onclick = predict;
-  document.getElementById('save').onclick = save;
-}
-
-async function predict() {
-  const id = document.getElementById('track').value;
-  const d = await (await fetch('/strategy/' + id + '?weather=' + weather)).json();
-  let h = '';
-  if (!d.best) {
-    h += '<div class="card">' + d.message + '</div>';
-  } else {
-    h += '<div class="card best"><h2>Recommended: ' + d.best.stops + ' stop(s)</h2>' + bar(d.best) +
-         '<div>Pit on lap(s): ' + (d.best.pit_laps.join(', ') || 'none') + '</div>' +
-         '<div class="small">' + d.best.why + '</div></div>';
-    h += '<h3>Other viable options</h3>';
-    d.alternatives.forEach(a => {
-      h += '<div class="card"><b>' + a.stops + ' stop(s)</b> &nbsp; +' + a.delta_s + 's' + bar(a) +
-           '<div class="small">' + a.why_not + '</div></div>';
-    });
-  }
-  if (d.rejected.length) {
-    h += '<h3>Not viable</h3>';
-    d.rejected.forEach(r => {
-      h += '<div class="card bad"><b>' + r.stops + ' stop(s)</b>' + bar(r) +
-           '<div class="small">' + r.why_not + '</div></div>';
-    });
-  }
-  document.getElementById('out').innerHTML = h;
-}
-
-async function save() {
-  const id = document.getElementById('track').value;
-  const r = await fetch('/strategy/' + id + '/save?weather=' + weather, {method: 'POST'});
-  const d = await r.json();
-  alert(r.ok ? 'Saved plan #' + d.saved_plan_id : (d.detail || 'Error'));
+  await loadTracks();
+  await loadSavedPlans();
+  await loadAcademicQueries();
+  await loadChampionshipStandings();
+  await loadAuditLog();
+  animatePageEntrance();
 }
 
 init();
